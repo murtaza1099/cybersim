@@ -1,0 +1,59 @@
+/* CyberSim design tokens — hex counterparts for JS/filter use */
+:root {
+  /* Neon accent colors (hex) */
+  --cyber-cyan:   #00e5ff;
+  --cyber-green:  #00ff87;
+  --cyber-red:    #ff2d6b;
+  --cyber-amber:  #ffb800;
+  --cyber-purple: #9d4edd;
+
+  /* Background scale (hex) */
+  --cyber-void:    #050810;
+  --cyber-base:    #090e1e;
+  --cyber-surface: #0e1528;
+  --cyber-elevated:#151d31;
+  --cyber-hover:   #1b2438;
+
+  /* Glass & border helpers */
+  --cyber-glass:         rgba(8, 13, 26, 0.72);
+  --cyber-glass-border:  rgba(0, 229, 255, 0.12);
+  --cyber-border-subtle: rgba(0, 229, 255, 0.08);
+  --cyber-border-glow:   rgba(0, 229, 255, 0.28);
+
+  /* Text scale (hex) */
+  --cyber-text-primary:   #dde4f0;
+  --cyber-text-secondary: #7a8bad;
+  --cyber-text-muted:     #3d4a60;
+  --cyber-text-accent:    #00e5ff;
+
+  /* Spacing & shape */
+  --cyber-radius:  8px;
+  --cyber-radius-lg: 16px;
+
+  /* ─── Level 1 simulation theme (mirrors src/pages/Level1/styles/theme.ts) ─── */
+  /* Typography */
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --font-body:    'DM Sans', sans-serif;
+
+  /* Brand colours */
+  --color-cyan:        #00f0ff;
+  --color-green:       #00ff88;
+  --color-red:         #ff3355;
+  --color-amber:       #ffaa00;
+  --color-surface:     rgba(8, 12, 20, 0.95);
+  --color-surface-deep:rgba(6, 10, 18, 0.97);
+  --color-border:      #3a3f4a;
+  --color-border-cyan: rgba(0, 240, 255, 0.2);
+  --color-text-muted:  #9ca3af;
+  --color-text-dim:    #6c7280;
+  --color-bg-base:     #050810;
+
+  /* Spacing */
+  --panel-width: 420px;
+
+  /* Animation */
+  --transition-panel: 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast:  200ms ease;
+  --transition-mid:   400ms ease;
+}

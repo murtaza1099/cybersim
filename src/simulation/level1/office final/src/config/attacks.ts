@@ -1,0 +1,68 @@
+import type { AttackPointDef } from '../types'
+
+export const ATTACK_POINTS: AttackPointDef[] = [
+  {
+    id: 1, displayName: 'Main Workstation', label: 'Phishing Email', tag: 'ATK_001',
+    anchorKey: 'PC_MONITOR_1', camKey: 'pc',
+    triggerOS: 'windows', appToOpen: 'outlook', audioCue: 'ui_click', scoreReward: 100,
+    isAttack: true, normalContext: null,
+    briefing: "A suspicious email arrived in your Outlook inbox. Something about the sender is wrong.",
+    hint: "Look very carefully at the sender's email address. Every character matters.",
+  },
+  {
+    id: 2, displayName: "John's Workstation", label: 'Fake Chrome Update', tag: 'ATK_002',
+    anchorKey: 'PC_MONITOR_2', camKey: 'pc',
+    triggerOS: 'windows', appToOpen: 'browser', audioCue: 'ui_click', scoreReward: 100,
+    isAttack: true, normalContext: null,
+    briefing: "Your browser has a popup demanding an update. Is it legitimate?",
+    hint: "Where does the download actually come from? Check the URL carefully.",
+  },
+  {
+    id: 3, displayName: 'Designer PC', label: 'LinkedIn Scam', tag: 'ATK_003',
+    anchorKey: 'PC_MONITOR_3', camKey: 'pc',
+    triggerOS: 'windows', appToOpen: 'browser', audioCue: 'ui_click', scoreReward: 100,
+    isAttack: false, normalContext: "A LinkedIn recruiter sent a connection request.",
+    briefing: "You have a new LinkedIn message with an attachment. Not everything is what it seems.",
+    hint: "Look very carefully at the file extension. What comes after .pdf?",
+  },
+  {
+    id: 4, displayName: 'Personal Phone', label: 'SMS Phishing', tag: 'ATK_004',
+    anchorKey: 'MOBILE_DESK', camKey: 'phone',
+    triggerOS: 'android', appToOpen: 'messages', audioCue: 'sms_notification', scoreReward: 120,
+    isAttack: true, normalContext: null,
+    briefing: "You received a text from your bank. Does anything seem off?",
+    hint: "What's the actual web address in the message? Compare it to your bank's real domain.",
+  },
+  {
+    id: 5, displayName: 'Office Landline', label: 'Vishing Call', tag: 'ATK_005',
+    anchorKey: 'DESK_PHONE', camKey: 'landline',
+    triggerOS: 'android', appToOpen: 'dialer', audioCue: 'phone_ring_landline', scoreReward: 120,
+    isAttack: false, normalContext: "A caller claims to be from IT support.",
+    briefing: "Phone call incoming. IT support wants to help remotely. Should you trust them?",
+    hint: "Would your real IT team need YOU to do anything on your computer to help you?",
+  },
+  {
+    id: 6, displayName: 'Unknown USB / Finance PC', label: 'USB Bait', tag: 'ATK_006',
+    anchorKey: 'WASHROOM', camKey: 'usb',
+    triggerOS: 'windows', appToOpen: 'fileExplorer', audioCue: 'ui_click', scoreReward: 150,
+    isAttack: true, normalContext: null,
+    briefing: "You found a USB stick in the washroom labelled 'Salary 2025'. Curiosity is the vulnerability.",
+    hint: "You didn't buy this USB. You don't know where it's been. What would happen if you opened those files?",
+  },
+  {
+    id: 7, displayName: 'Office Door', label: 'Delivery Pretext', tag: 'ATK_007',
+    anchorKey: 'ENTRY_DOOR', camKey: 'door',
+    triggerOS: 'scene', appToOpen: null, audioCue: 'door_knock', scoreReward: 150,
+    isAttack: false, normalContext: "A delivery arrived at the front door.",
+    briefing: "Unexpected delivery. The courier has an unusual request after you sign. What do you do?",
+    hint: "What legitimate reason would a delivery person have to access your server room?",
+  },
+  {
+    id: 8, displayName: 'Admin Workstation', label: 'Malware Detection', tag: 'ATK_008',
+    anchorKey: 'NOTEPAD', camKey: 'notepad',
+    triggerOS: 'windows', appToOpen: 'fileExplorer', audioCue: 'ui_click', scoreReward: 200,
+    isAttack: true, normalContext: null,
+    briefing: "An unknown process is running on your PC. The USB from earlier may have been a trap.",
+    hint: "The goal isn't to fix it yourself — it's to contain the damage.",
+  },
+]

@@ -1,0 +1,29 @@
+{
+  "startCamera": { "position": [-8.72, 2, 2.49], "target": [0.5, 0.9, 0.5], "fov": 56 },
+  "cameraLimits": {
+    "minDistance": 0.5,
+    "maxDistance": 9.5,
+    "minPolarAngle": 0.7086036763096978,
+    "maxPolarAngle": 1.7139133254584316,
+    "minAzimuthAngle": -1.361356816555577,
+    "maxAzimuthAngle": 1.8675022996339325
+  },
+  "props": [
+    { "id": "phone", "glbPath": "/Smartphone.glb", "position": [-0.75, 0.78, -0.25], "rotation": [-1.57, 6.28, 0], "scale": [1.15, 1.15, 1.15], "visible": true, "castShadow": true },
+    { "id": "telephone", "glbPath": "/Telephone.glb", "position": [-0.15, 0.9, 1.9], "rotation": [0, 3.8, 0], "scale": [0.35, 0.35, 0.35], "visible": true, "castShadow": true },
+    { "id": "usb", "glbPath": "/usb_memory.glb", "position": [1.2, 1.13, 4.35], "rotation": [0, 4.7, 0], "scale": [0.1, 0.1, 0.1], "visible": true, "castShadow": true },
+    { "id": "whiteboard", "glbPath": "/Whiteboard.glb", "position": [4.09, 1.75, -0.1], "rotation": [0, 4.75, 0], "scale": [1.75, 1.75, 1.75], "visible": true, "castShadow": true },
+    { "id": "box", "glbPath": "/Box.glb", "position": [4.85, 0.04, 3.27], "rotation": [0, 0, 0], "scale": [1.4687875223324514, 1, 1], "visible": true, "castShadow": true },
+    { "id": "holder", "glbPath": "/DeskOrganizer.glb", "position": [0.23, 0.53, -0.15], "rotation": [0, 4.15, 0], "scale": [0.5, 0.5, 0.5], "visible": true, "castShadow": true }
+  ],
+  "hotspots": [
+    { "id": 1, "label": "Main Workstation", "attackId": "ATK_001", "anchorPosition": [-0.45, 1.36, 0.37], "focusCam": { "position": [-1.65, 1.42, 0.42], "target": [1.7, 0.71, 0.62], "fov": 55, "duration": 1.2 }, "state": "unlocked", "visible": true, "unlockAfter": null },
+    { "id": 2, "label": "John's Workstation", "attackId": "ATK_002", "anchorPosition": [0.92, 1.28, 0.37], "focusCam": { "position": [2.28, 1.42, 0.69], "target": [1.25, 1.44, 0.58], "fov": 56, "duration": 1.2 }, "state": "unlocked", "visible": true, "unlockAfter": null },
+    { "id": 3, "label": "Designer PC", "attackId": "ATK_003", "anchorPosition": [0.47, 0.84, -2.11], "focusCam": { "position": [2.42, 1.51, -1.86], "target": [0.93, 0.58, -1.8], "fov": 54, "duration": 1.2 }, "state": "unlocked", "visible": true, "unlockAfter": null },
+    { "id": 4, "label": "Personal Phone", "attackId": "ATK_004", "anchorPosition": [-0.85, 0.78, -0.45], "focusCam": { "position": [-1.12, 4.47, 0.91], "target": [-1.08, 3.99, 0.72], "fov": 55, "duration": 1.2 }, "state": "unlocked", "visible": true, "unlockAfter": null },
+    { "id": 5, "label": "Office Landline", "attackId": "ATK_005", "anchorPosition": [-0.1, 1.05, 1.9], "focusCam": { "position": [-1.49, 2.8, -1.09], "target": [0.32, 0.9, 1.95], "fov": 55, "duration": 1.2 }, "state": "unlocked", "visible": true, "unlockAfter": null },
+    { "id": 6, "label": "Unknown USB / Finance PC", "attackId": "ATK_006", "anchorPosition": [1.33, 1.2, 4.34], "focusCam": { "position": [1.96, 3.62, 2.74], "target": [1.46, 1.62, 4.34], "fov": 55, "duration": 1.2 }, "state": "locked", "visible": true, "unlockAfter": null },
+    { "id": 7, "label": "Office Door", "attackId": "ATK_007", "anchorPosition": [4.35, 1.38, 3.28], "focusCam": { "position": [0.65, 3.35, 3.1], "target": [6.21, 1.26, 2.39], "fov": 55, "duration": 1.2 }, "state": "locked", "visible": true, "unlockAfter": null },
+    { "id": 8, "label": "Admin Workstation", "attackId": "ATK_008", "anchorPosition": [-0.35, 0.97, -1.86], "focusCam": { "position": [-1.94, 1.63, -0.45], "target": [-0.68, 1.21, -1.76], "fov": 55, "duration": 1.2 }, "state": "locked", "visible": true, "unlockAfter": 6 }
+  ]
+}

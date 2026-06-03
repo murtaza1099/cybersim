@@ -1,0 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-void: 228 60% 3%;
+    --bg-base: 224 50% 7%;
+    --bg-surface: 224 46% 10%;
+    --bg-elevated: 224 42% 14%;
+    --bg-hover: 224 38% 17%;
+
+    --neon-cyan: 187 100% 50%;
+    --neon-green: 152 100% 50%;
+    --neon-red: 342 100% 58%;
+    --neon-amber: 43 100% 50%;
+    --neon-purple: 270 70% 59%;
+
+    --text-primary: 220 30% 93%;
+    --text-secondary: 220 20% 62%;
+    --text-muted: 220 15% 35%;
+    --text-accent: 187 100% 50%;
+
+    --background: var(--bg-void);
+    --foreground: var(--text-primary);
+    --card: var(--bg-surface);
+    --card-foreground: var(--text-primary);
+    --popover: var(--bg-elevated);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--neon-cyan);
+    --primary-foreground: 224 50% 7%;
+    --secondary: var(--bg-elevated);
+    --secondary-foreground: var(--text-primary);
+    --muted: var(--bg-surface);
+    --muted-foreground: var(--text-secondary);
+    --accent: var(--neon-cyan);
+    --accent-foreground: 224 50% 7%;
+    --destructive: var(--neon-red);
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 30% 15%;
+    --input: var(--bg-elevated);
+    --ring: var(--neon-cyan);
+    --radius: 0.5rem;
+
+    --glass-bg: rgba(8, 13, 26, 0.7);
+    --glass-border: rgba(0, 229, 255, 0.12);
+    --border-subtle: rgba(0, 229, 255, 0.08);
+    --border-glow: rgba(0, 229, 255, 0.25);
+
+    --sidebar-background: var(--bg-surface);
+    --sidebar-foreground: var(--text-primary);
+    --sidebar-primary: var(--neon-cyan);
+    --sidebar-primary-foreground: 224 50% 7%;
+    --sidebar-accent: var(--bg-elevated);
+    --sidebar-accent-foreground: var(--text-primary);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--neon-cyan);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background-color: hsl(var(--bg-void));
+    color: hsl(var(--text-primary));
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+
+  ::selection {
+    background: rgba(0, 229, 255, 0.25);
+    color: hsl(var(--text-primary));
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: hsl(var(--bg-void)); }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--neon-cyan) / 0.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--neon-cyan) / 0.5); }
+
+  *:focus-visible {
+    outline: 2px solid hsl(var(--neon-cyan));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .font-display { font-family: 'Orbitron', sans-serif; }
+  .font-mono    { font-family: 'JetBrains Mono', monospace; }
+  .font-body    { font-family: 'DM Sans', sans-serif; }
+}
+
+/* ─── Keyframes ──────────────────────────────────────────────────────── */
+@keyframes neon-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+@keyframes glow-border {
+  0%, 100% { border-color: var(--border-subtle); }
+  50% { border-color: var(--border-glow); }
+}
+@keyframes grid-scroll {
+  0%   { transform: perspective(500px) rotateX(60deg) translateY(0); }
+  100% { transform: perspective(500px) rotateX(60deg) translateY(50px); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+@keyframes scan-line {
+  0%   { top: -100%; }
+  100% { top:  100%; }
+}
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Animation utilities ────────────────────────────────────────────── */
+.animate-neon-pulse  { animation: neon-pulse 3s ease-in-out infinite; }
+.animate-glow-border { animation: glow-border 4s ease-in-out infinite; }
+.animate-float       { animation: float 3s ease-in-out infinite; }
+.animate-fade-in-up  { animation: fade-in-up 0.4s ease-out both; }
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, hsl(var(--neon-cyan) / 0.05) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* ─── Core component styles ──────────────────────────────────────────── */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.glass-card-hover {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.glass-card-hover:hover {
+  border-color: var(--border-glow);
+  box-shadow: 0 4px 32px rgba(0,0,0,0.5), 0 0 24px rgba(0,229,255,0.07), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* ─── Neon text shadows ───────────────────────────────────────────────── */
+.neon-text-cyan   { text-shadow: 0 0 10px hsl(var(--neon-cyan)   / 0.5), 0 0 40px hsl(var(--neon-cyan)   / 0.2); }
+.neon-text-green  { text-shadow: 0 0 10px hsl(var(--neon-green)  / 0.5), 0 0 40px hsl(var(--neon-green)  / 0.2); }
+.neon-text-red    { text-shadow: 0 0 10px hsl(var(--neon-red)    / 0.5), 0 0 40px hsl(var(--neon-red)    / 0.2); }
+.neon-text-amber  { text-shadow: 0 0 10px hsl(var(--neon-amber)  / 0.5), 0 0 40px hsl(var(--neon-amber)  / 0.2); }
+.neon-text-purple { text-shadow: 0 0 10px hsl(var(--neon-purple) / 0.5), 0 0 40px hsl(var(--neon-purple) / 0.2); }
+
+/* ─── Scan-line overlay ──────────────────────────────────────────────── */
+.scan-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent, rgba(0, 229, 255, 0.03), transparent);
+  height: 200%;
+  animation: scan-line 8s linear infinite;
+  pointer-events: none;
+}
+
+/* ─── Status dots ────────────────────────────────────────────────────── */
+.status-dot         { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.status-dot-online  { background: hsl(var(--neon-green)); box-shadow: 0 0 6px hsl(var(--neon-green) / 0.6); }
+.status-dot-warning { background: hsl(var(--neon-amber)); box-shadow: 0 0 6px hsl(var(--neon-amber) / 0.6); }
+.status-dot-danger  { background: hsl(var(--neon-red));   box-shadow: 0 0 6px hsl(var(--neon-red)   / 0.6); }
+
+/* ─── Gradient divider ───────────────────────────────────────────────── */
+.divider-glow {
+  height: 1px;
+  background: linear-gradient(to right, transparent, hsl(var(--neon-cyan) / 0.25), transparent);
+}
+
+/* ─── Data table row hover ───────────────────────────────────────────── */
+.data-row {
+  border-top: 1px solid hsl(var(--border));
+  transition: background 0.15s ease;
+}
+.data-row:hover { background: hsl(var(--bg-hover) / 0.4); }
+
+/* ─── Thin scrollbar variant ─────────────────────────────────────────── */
+.scrollbar-thin::-webkit-scrollbar       { width: 4px; height: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--neon-cyan) / 0.2); border-radius: 2px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: hsl(var(--neon-cyan) / 0.4); }
+
+/* ─── Responsive helpers ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .ml-\[260px\] { margin-left: 0 !important; }
+}
+
+/* ─── Level 1 simulation root ────────────────────────────────────────── */
+.cybersim-level1-root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #050810;
+  font-family: 'DM Sans', sans-serif;
+}
+.cybersim-level1-root button,
+.cybersim-level1-root canvas {
+  touch-action: manipulation;
+}
