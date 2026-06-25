@@ -3,7 +3,7 @@ import { useGameStore }   from '../stores/gameStore'
 import { ATTACK_POINTS }  from '../config/attacks'
 import type { Level1ExitResult } from '../App'
 
-const MAX_SCORE = 940
+const MAX_SCORE = ATTACK_POINTS.reduce((sum, a) => sum + a.scoreReward, 0)
 
 function getRating(score: number): { label: string; color: string } {
   if (score >= MAX_SCORE)    return { label: 'EXPERT DEFENDER',    color: '#00ff88' }
@@ -40,6 +40,7 @@ export default function CompletionScreen({ onExit }: CompletionScreenProps) {
       status: 'completed',
       completedAttacks: completed,
       failedAttacks: failed,
+      pcSubAttackResults: useGameStore.getState().pcSubAttackResults,
     })
   }
 

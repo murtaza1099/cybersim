@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
+import { ATTACK_POINTS } from '../../config/attacks'
 
 // One-time keyframes for the avatar pulse
 if (typeof document !== 'undefined' && !document.getElementById('aria-kf')) {
@@ -38,7 +39,7 @@ export default function GuideCharacter({ introComplete }: Props) {
   const failedPoints       = useGameStore(s => s.failedPoints)
   const lockedToastVisible = useGameStore(s => s.lockedToastVisible)
   const activeLayer        = useGameStore(s => s.activeLayer)
-  const allComplete = new Set([...completedPoints, ...failedPoints]).size === 8
+  const allComplete = ATTACK_POINTS.every(a => completedPoints.includes(a.id) || failedPoints.includes(a.id))
 
   const [message, setMessage] = useState<string | null>(null)
   const [visible, setVisible] = useState(false)

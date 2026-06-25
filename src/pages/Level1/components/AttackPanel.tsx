@@ -146,7 +146,7 @@ export default function AttackPanel() {
         </div>
 
         <div style={{ fontFamily: fonts.mono, fontSize: 10, color: colors.border, marginTop: 14 }}>
-          SCORE: {score} // OBJ {completedPoints.length}/8
+          SCORE: {score} // OBJ {completedPoints.filter(id => ATTACK_POINTS.some(a => a.id === id)).length}/{ATTACK_POINTS.length}
         </div>
       </>}
     </div>

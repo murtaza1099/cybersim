@@ -1,234 +1,287 @@
 import { useState } from 'react'
-import { useGameStore } from '../../../stores/gameStore'
-import { useCameraStore } from '../../../stores/cameraStore'
+import { usePcStore } from '../../../stores/pcStore'
+import { colors, fonts } from '../../../styles/theme'
+import type { PcSubAttackId } from '../../../types'
 
-if (typeof document !== 'undefined' && !document.getElementById('ol-sb')) {
-  const s = document.createElement('style')
-  s.id = 'ol-sb'
-  s.textContent = `
-    .ol-scroll::-webkit-scrollbar { width: 4px }
-    .ol-scroll::-webkit-scrollbar-track { background: #0a0e14 }
-    .ol-scroll::-webkit-scrollbar-thumb { background: #00f0ff44; border-radius: 2px }
-    .ol-scroll::-webkit-scrollbar-thumb:hover { background: #00f0ff88 }
-    @keyframes ptsMinus { 0%,100% { opacity:1 } 60% { opacity:0.4 } }
-    .pts-flash { animation: ptsMinus 0.4s ease 3 }
-  `
-  document.head.appendChild(s)
+const mono: React.CSSProperties = { fontFamily: fonts.mono }
+const neutralDecisionButton: React.CSSProperties = {
+  flex: 1,
+  padding: '9px 0',
+  borderRadius: 6,
+  cursor: 'pointer',
+  background: 'transparent',
+  border: '1px solid rgba(0,240,255,0.28)',
+  color: colors.textPrimary,
+  ...mono,
+  fontSize: 11,
+}
+const ordinaryLinkButton: React.CSSProperties = {
+  padding: 0,
+  background: 'transparent',
+  border: 'none',
+  color: colors.textPrimary,
+  ...mono,
+  fontSize: 12,
+  cursor: 'pointer',
+  textDecoration: 'underline',
 }
 
-const EMAILS = [
+type Outcome = 'pass' | 'fail' | 'fp' | 'archived'
+
+interface BodyLine { t: 'text' | 'info'; text: string }
+interface Mail {
+  key: string
+  firedKey?: string          // visibility gate (undefined = always present)
+  attackId?: PcSubAttackId   // present → this email IS a trainable attack
+  legit?: boolean
+  calibration?: boolean      // looks suspicious but is genuinely legitimate
+  reportEventId?: string     // for false-positive tracking (legit only)
+  from: string
+  replyTo?: string
+  display: string
+  external?: boolean
+  realDomain: string         // revealed when the sender is expanded
+  domainTip: string
+  domainOk: boolean
+  subject: string
+  body: BodyLine[]
+  link?: { label: string; url: string }   // malicious in-body link (phish)
+  maliciousLabel?: string    // malicious action-bar button (ceo)
+  safeLabel: string          // safe action-bar button (attack)
+}
+
+const MAILS: Mail[] = [
   {
-    id: 'a',
-    from: 'IT-Security@micros0ft-helpdesk.net',
-    fromTooltip: '⚠ Domain mismatch: "micros0ft" uses a zero (0) not the letter O',
-    subject: '⚠ URGENT: Verify your account or lose access in 24h',
-    unread: true,
-    phishing: true,
+    key: 'phish', firedKey: 'phish_email', attackId: 'email_phish',
+    from: 'IT-Security@micros0ft-helpdesk.net', display: 'Microsoft Account Team',
+    replyTo: 'security-notice@account-microsoft-verify.com', external: true,
+    realDomain: 'micros0ft-helpdesk.net', domainOk: false,
+    domainTip: '“micros0ft” uses a zero (0), and the domain is not microsoft.com',
+    subject: '⚠ Unusual sign-in — verify within 24h or lose access',
     body: [
-      { type: 'text', content: 'Dear [Employee],\n\nWe have detected unusual sign-in activity on your Microsoft 365 account.\nTo prevent unauthorized access, you must verify your credentials within\n24 hours or your account will be suspended.\n\nYour sign-in was detected from:\n' },
-      { type: 'info', content: 'Location: Novosibirsk, Russia\nDevice: Unknown Android Device\nTime: Today at 3:42 AM\n' },
-      { type: 'text', content: '\nClick here to verify your identity:\n' },
-      { type: 'cta', content: 'VERIFY NOW →', url: 'http://micros0ft-verify.ru/login' },
-      { type: 'text', content: '\n\nIf you do not verify, IT will be forced to disable your account.\n\nRegards,\nMicrosoft IT Security Team\nCase ID: #MSF-2024-88821' },
+      { t: 'text', text: 'Dear User,\n\nWe detected an unusual sign-in to your Microsoft 365 account. To keep your account active you must verify your identity within 24 hours.\n' },
+      { t: 'info', text: 'Location: Novosibirsk, Russia · Device: Unknown · 03:42 AM · Case ID: MS-778421' },
+      { t: 'text', text: '\n\nVerify your identity here:' },
+      { t: 'text', text: '\n\nRegards,\nMicrosoft account services\nSecurity notifications team\n\nThis message was sent by an automated mailbox. Microsoft will never ask for your password by email.' },
     ],
+    link: { label: 'VERIFY NOW →', url: 'http://account-microsoft-verify.com/login' },
+    safeLabel: '[ REPORT PHISHING ]',
   },
   {
-    id: 'b',
-    from: 'calendar@company.com',
-    fromTooltip: null,
-    subject: 'Q2 All-Hands — Thursday 3pm',
-    unread: false,
-    phishing: false,
-    body: [{ type: 'text', content: 'Hi team,\n\nReminder: Q2 All-Hands is this Thursday at 3pm in Conference Room B.\nPlease confirm your attendance via the calendar invite.\n\nBest,\nAdmin Team' }],
+    key: 'manager', firedKey: 'manager_email', legit: true, reportEventId: 'manager',
+    from: 'priya.sharma@techcorp.com', display: 'Priya Sharma',
+    realDomain: 'techcorp.com', domainOk: true, domainTip: 'matches the company domain',
+    subject: 'RE: 1:1 agenda for today',
+    body: [
+      { t: 'text', text: 'Hi,\n\nFor our 1:1 at 15:00 — let’s cover the Q2 roadmap, your training plan, and the new starter onboarding. No prep needed.\n\nSee you then,\nPriya' },
+    ],
+    safeLabel: '[ REPORT PHISHING ]',
   },
   {
-    id: 'c',
-    from: 'updates@slack.com',
-    fromTooltip: null,
-    subject: 'New message in #general',
-    unread: false,
-    phishing: false,
-    body: [{ type: 'text', content: 'You have 3 new messages in #general:\n\n• Alex: Morning everyone!\n• Sam: Has anyone reviewed the new design?\n• Jordan: Sending the report shortly.\n\nOpen Slack to reply.' }],
+    key: 'ceo', firedKey: 'ceo_email', attackId: 'ceo_fraud',
+    from: 'david.walsh@techc0rp-hq.com', display: 'David Walsh (CEO)',
+    external: true,
+    realDomain: 'techc0rp-hq.com', domainOk: false,
+    domainTip: '“techc0rp-hq.com” — a zero and a hyphen. The real domain is techcorp.com',
+    subject: 'URGENT — Confidential transfer request',
+    body: [
+      { t: 'text', text: 'I’m in back-to-back meetings and can’t talk. I need you to process a supplier payment of £12,500 in the next 30 minutes — new vendor, details below.\n\nKeep this between us for now, don’t loop in finance until it’s done. I’m counting on you.\n\nSent from my iPhone\n\n' },
+      { t: 'info', text: '---------- Forwarded message ---------\nFrom: Megan Patel <megan.patel@northbridge-supplies.co>\nDate: Tue, 14 Mar, 14:57\nSubject: Updated remittance details' },
+      { t: 'text', text: '\n\nDavid,\n\nAs discussed, please use the revised beneficiary account for today’s settlement. The previous invoice reference still applies.\n\nMegan' },
+    ],
+    maliciousLabel: 'Reply — I’ll process this',
+    safeLabel: 'Verify by phone / report to finance',
+  },
+  {
+    key: 'newsletter', firedKey: 'newsletter', legit: true, reportEventId: 'newsletter',
+    from: 'news@techcorp.com', display: 'TechCorp Comms',
+    realDomain: 'techcorp.com', domainOk: true, domainTip: 'matches the company domain',
+    subject: 'TechCorp Weekly — March digest',
+    body: [
+      { t: 'text', text: 'This week: the new café menu, a reminder about hybrid days, and three open roles in Engineering. Have a great week!\n\n— Internal Comms' },
+    ],
+    safeLabel: '[ REPORT PHISHING ]',
+  },
+  {
+    // CALIBRATION TRAP — looks alarming (urgency, deadline, a typo) but is a real
+    // internal notice: correct domain, no link, points to the known portal.
+    key: 'it_policy', firedKey: 'it_policy', legit: true, calibration: true, reportEventId: 'it_policy',
+    from: 'it-helpdesk@techcorp.com', display: 'IT Helpdesk',
+    realDomain: 'techcorp.com', domainOk: true, domainTip: 'matches the company domain',
+    subject: '⚠ ACTION REQUIRED: Password policy update — reset by Friday',
+    body: [
+      { t: 'text', text: 'Hi all,\n\nAs part of our quarterly security review, all staff must update there password before Friday 17:00. Please do this via the usual Company Portal (Settings → Security → Change Password).\n\n' },
+      { t: 'info', text: 'We will NEVER email you a reset link — ignore and report any message that contains one.' },
+      { t: 'text', text: '\n\nThanks,\nIT Helpdesk' },
+    ],
+    safeLabel: '[ REPORT PHISHING ]',
   },
 ]
 
-const mono: React.CSSProperties = { fontFamily: "'JetBrains Mono',monospace" }
-
-type ConsequenceState = { text: string; pts: string } | null
-
 export default function OutlookApp() {
-  const activePoint = useGameStore(s => s.activePoint)
-  const [selected, setSelected]       = useState<string>('a')
-  const [consequence, setConsequence] = useState<ConsequenceState>(null)
-  const [hoverSender, setHoverSender] = useState(false)
-  const [hoverUrl, setHoverUrl]       = useState(false)
-  const [succeeded, setSucceeded]     = useState(false)
-  const completePoint = useGameStore(s => s.completePoint)
-  const failAttempt   = useGameStore(s => s.failAttempt)
-  const exitToScene   = useGameStore(s => s.exitToScene)
+  const fired           = usePcStore(s => s.fired)
+  const firedAt         = usePcStore(s => s.firedAt)
+  const recordInspection = usePcStore(s => s.recordInspection)
+  const resolveAttack   = usePcStore(s => s.resolveAttack)
+  const reportLegit     = usePcStore(s => s.reportLegit)
 
-  if (activePoint !== 1) return null
+  // Emails appear only once their notification fires, ordered by arrival (newest last).
+  const visible = MAILS
+    .filter(m => m.firedKey && fired[m.firedKey])
+    .sort((a, b) => (firedAt[a.firedKey ?? ''] ?? 0) - (firedAt[b.firedKey ?? ''] ?? 0))
+  const [selected, setSelected] = useState<string>('phish')
+  const [expanded, setExpanded] = useState(false)
+  const [hoverLink, setHoverLink] = useState(false)
+  const [outcomes, setOutcomes]   = useState<Record<string, Outcome>>({})
 
-  const email = EMAILS.find(e => e.id === selected)!
+  const mail = visible.find(m => m.key === selected) ?? visible[0]
+  const outcome = mail ? outcomes[mail.key] : undefined
 
-  const handleSelect = (id: string) => {
-    if (consequence) return
-    setSelected(id)
-    setSucceeded(false)
+  // Inbox starts empty — messages arrive as their notifications fire.
+  if (!mail) {
+    return (
+      <div style={{ display: 'flex', height: '100%', background: '#1b1b1b', color: '#9aa0a6', alignItems: 'center', justifyContent: 'center', fontFamily: fonts.body }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: fonts.display, fontSize: 11, color: colors.cyan, letterSpacing: '0.12em', marginBottom: 8 }}>INBOX (0)</div>
+          <div style={{ fontSize: 13 }}>No messages yet.</div>
+        </div>
+      </div>
+    )
   }
 
-  const handleVerifyNow = () => {
-    failAttempt(1, 'clicked_verify_link')
-    setConsequence({
-      pts: '−10 PTS',
-      text: 'You clicked a credential-harvesting link. Your Microsoft password would now be in the attacker\'s hands.\n\nIn reality: always verify the sender domain character by character before clicking any link. The "o" in "microsoft" was a zero (0) — "micros0ft" — pointing to a Russian .ru domain.',
-    })
+  const select = (key: string) => { setSelected(key); setExpanded(false); setHoverLink(false) }
+
+  const inspectSender = () => {
+    setExpanded(true)
+    if (mail.attackId) recordInspection(mail.attackId, 'sender')
+  }
+  const onHoverLink = () => {
+    setHoverLink(true)
+    if (mail.attackId) recordInspection(mail.attackId, 'link')
   }
 
-  const handleReportPhishing = () => {
-    setSucceeded(true)
-    setTimeout(() => completePoint(1, 100), 600)
-  }
+  const setOutcome = (o: Outcome) => setOutcomes(prev => ({ ...prev, [mail.key]: o }))
 
-  const handleUnderstood = () => {
-    exitToScene()
-    useCameraStore.getState().restoreInitial()
+  const handleMalicious = () => {
+    if (mail.attackId) resolveAttack(mail.attackId, false, mail.maliciousLabel ?? mail.link?.label ?? 'clicked')
+    setOutcome('fail')
   }
+  const handleSafe = () => {
+    if (mail.attackId) { resolveAttack(mail.attackId, true, 'reported'); setOutcome('pass') }
+    else if (mail.legit) { reportLegit(mail.reportEventId ?? mail.key); setOutcome('fp') }
+  }
+  const handleArchive = () => setOutcome('archived')
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: '#060a12', color: '#e5e7eb', position: 'relative' }}>
-
-      {/* Consequence overlay */}
-      {consequence && (
-        <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(18,2,6,0.97)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          padding: '32px 40px', zIndex: 20,
-        }}>
-          <div className="pts-flash" style={{ ...mono, fontSize: 22, color: '#ff3355', fontWeight: 700, marginBottom: 20, letterSpacing: '0.1em' }}>
-            {consequence.pts}
-          </div>
-          <div style={{ ...mono, fontSize: 10, color: '#ff335588', letterSpacing: '0.18em', marginBottom: 14 }}>
-            SECURITY FAILURE
-          </div>
-          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: '#ff8899', lineHeight: 1.8, textAlign: 'center', maxWidth: 380, marginBottom: 28, whiteSpace: 'pre-line' }}>
-            {consequence.text}
-          </div>
-          <button onClick={handleUnderstood} style={{
-            padding: '9px 28px', background: 'transparent', border: '1px solid #ff3355',
-            color: '#ff6688', ...mono, fontSize: 11, cursor: 'pointer', borderRadius: 4, letterSpacing: '0.08em',
-          }}>RETURN TO OFFICE</button>
+    <div style={{ display: 'flex', height: '100%', background: '#1b1b1b', color: '#e5e7eb' }}>
+      {/* Mail list */}
+      <div style={{ width: '36%', borderRight: '1px solid #2a2a2a', overflowY: 'auto', background: '#202020' }}>
+        <div style={{ padding: '10px 14px', fontFamily: fonts.display, fontSize: 11, color: colors.cyan, borderBottom: '1px solid #2a2a2a' }}>
+          INBOX ({visible.length})
         </div>
-      )}
-
-      {/* Email list */}
-      <div className="ol-scroll" style={{ width: '34%', borderRight: '1px solid #1a1f2a', overflowY: 'auto' }}>
-        <div style={{ padding: '10px 14px', fontFamily: "'Orbitron',sans-serif", fontSize: 11, color: '#00f0ff', borderBottom: '1px solid #1a1f2a' }}>
-          INBOX (3)
-        </div>
-        {EMAILS.map(e => (
-          <div key={e.id} onClick={() => handleSelect(e.id)}
-               style={{ padding: '10px 14px', borderBottom: '1px solid #1a1f2a', cursor: 'pointer', background: selected === e.id ? '#0d1320' : 'transparent', position: 'relative' }}>
-            {e.unread && (
-              <div style={{ position: 'absolute', top: 10, right: 12, width: 7, height: 7, borderRadius: '50%', background: '#ff4466' }} />
-            )}
-            <div style={{ fontSize: 11, color: e.phishing ? '#ff6688' : '#6c7280', ...mono, marginBottom: 2, paddingRight: 16 }}>{e.from}</div>
-            <div style={{ fontSize: 12, color: '#e5e7eb', fontWeight: e.unread ? 700 : 400 }}>{e.subject}</div>
-          </div>
-        ))}
+        {visible.map(m => {
+          const done = outcomes[m.key]
+          return (
+            <div key={m.key} onClick={() => select(m.key)} style={{
+              padding: '10px 26px 10px 14px', borderBottom: '1px solid #2a2a2a', cursor: 'pointer',
+              background: selected === m.key ? '#2d2d2d' : 'transparent', position: 'relative',
+            }}>
+              {/* Neutral styling — no red, so attacks aren't given away before inspection */}
+              <div style={{ ...mono, fontSize: 11, color: '#9aa0a6', marginBottom: 2 }}>{m.display}</div>
+              <div style={{ fontSize: 12, color: '#e5e7eb', fontWeight: done ? 400 : 600, opacity: done ? 0.55 : 1 }}>{m.subject}</div>
+              {done ? (
+                <span style={{ position: 'absolute', top: 12, right: 12, ...mono, fontSize: 10, color: done === 'pass' ? colors.green : done === 'fail' || done === 'fp' ? colors.red : colors.textDim }}>
+                  {done === 'pass' ? '✓' : done === 'archived' ? '—' : '✕'}
+                </span>
+              ) : (
+                <span style={{ position: 'absolute', top: 15, right: 13, width: 7, height: 7, borderRadius: '50%', background: '#4cc2ff' }} title="Unread" />
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* Reader */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div className="ol-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 12px', minHeight: 0 }}>
-          <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: '#e5e7eb', marginBottom: 6 }}>{email.subject}</div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px 12px', minHeight: 0 }}>
+          <div style={{ fontFamily: fonts.display, fontSize: 14, color: '#f3f4f6', marginBottom: 8 }}>{mail.subject}</div>
 
-          {/* Sender with hover tooltip */}
-          <div style={{ position: 'relative', display: 'inline-block', marginBottom: 16 }}
-               onMouseEnter={() => setHoverSender(true)}
-               onMouseLeave={() => setHoverSender(false)}>
-            <div style={{ fontSize: 11, color: email.phishing ? '#ff6688' : '#6c7280', ...mono, cursor: email.phishing ? 'help' : 'default' }}>
-              From: {email.from}
+          {mail.external && (
+            <div style={{ ...mono, fontSize: 10.5, color: colors.amber, background: 'rgba(255,170,0,0.08)', border: '1px solid rgba(255,170,0,0.24)', borderRadius: 5, padding: '7px 10px', marginBottom: 10 }}>
+              External sender: this message originated outside TechCorp. Verify sender and reply-to before acting.
             </div>
-            {hoverSender && email.fromTooltip && (
-              <div style={{
-                position: 'absolute', bottom: '130%', left: 0, zIndex: 30,
-                background: '#1a0808', border: '1px solid #ff335566',
-                color: '#ff9988', ...mono, fontSize: 11,
-                padding: '5px 10px', borderRadius: 4, whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-              }}>
-                {email.fromTooltip}
-              </div>
-            )}
+          )}
+
+          {/* Sender + expandable inspection */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div style={{ ...mono, fontSize: 11, color: '#9aa0a6' }}>From: {mail.display}</div>
+            <button onClick={inspectSender} style={{ ...mono, fontSize: 10, background: 'none', border: '1px solid #3a3a3a', color: '#9aa0a6', borderRadius: 4, padding: '1px 7px', cursor: 'pointer' }}>▾ details</button>
           </div>
+          {expanded && (
+            <div style={{ ...mono, fontSize: 10.5, lineHeight: 1.6, marginBottom: 14, padding: '7px 10px', borderRadius: 5, background: mail.domainOk ? 'rgba(0,255,136,0.06)' : 'rgba(255,51,85,0.07)', border: `1px solid ${mail.domainOk ? 'rgba(0,255,136,0.25)' : 'rgba(255,51,85,0.3)'}` }}>
+              <div style={{ color: '#cdd6e3' }}>From: {mail.from}</div>
+              {mail.replyTo && <div style={{ color: '#cdd6e3' }}>Reply-To: {mail.replyTo}</div>}
+              <div style={{ color: mail.domainOk ? colors.green : '#ff8da3', marginTop: 3 }}>
+                {mail.domainOk ? '✓' : '⚠'} {mail.realDomain} — {mail.domainTip}
+              </div>
+            </div>
+          )}
 
           {/* Body */}
-          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: '#9ca3af', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
-            {email.body.map((part, i) => {
-              if (part.type === 'text') return <span key={i}>{part.content}</span>
-              if (part.type === 'info') return <span key={i} style={{ color: '#ffbb44', ...mono, fontSize: 12 }}>{part.content}</span>
-              if (part.type === 'cta') return (
-                <span key={i} style={{ display: 'inline-block', marginTop: 4 }}>
-                  <button
-                    onMouseEnter={() => setHoverUrl(true)}
-                    onMouseLeave={() => setHoverUrl(false)}
-                    onClick={handleVerifyNow}
-                    style={{
-                      padding: '8px 18px', background: '#1a3a8a', border: '1px solid #4466cc',
-                      color: '#88aaff', ...mono, fontSize: 12, cursor: 'pointer', borderRadius: 4,
-                      letterSpacing: '0.05em',
-                    }}>
-                    {part.content}
-                  </button>
-                </span>
-              )
-              return null
-            })}
+          <div style={{ fontFamily: fonts.body, fontSize: 13, color: '#c8c8c8', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
+            {mail.body.map((p, i) => p.t === 'info'
+              ? <span key={i} style={{ color: colors.amber, ...mono, fontSize: 12 }}>{p.text}</span>
+              : <span key={i}>{p.text}</span>)}
           </div>
 
-          {/* Status bar URL hint */}
-          {hoverUrl && (
-            <div style={{ marginTop: 10, ...mono, fontSize: 10, color: '#ff6644', background: '#1a0808', padding: '3px 8px', borderRadius: 3, display: 'inline-block' }}>
-              → http://micros0ft-verify.ru/login
+          {mail.link && !outcome && (
+            <div style={{ marginTop: 12 }}>
+              <button onMouseEnter={onHoverLink} onMouseLeave={() => setHoverLink(false)} onClick={handleMalicious} style={ordinaryLinkButton}>{mail.link.label}</button>
+              {hoverLink && <div style={{ marginTop: 8, ...mono, fontSize: 10, color: colors.textMuted, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,240,255,0.16)', padding: '3px 8px', borderRadius: 3, display: 'inline-block' }}>→ {mail.link.url}</div>}
             </div>
           )}
-
-          {/* Non-phishing safe note */}
-          {!email.phishing && (
-            <div style={{ marginTop: 14, padding: '5px 10px', borderRadius: 4, background: '#001a0a', border: '1px solid #00ff8822', color: '#00ff8866', ...mono, fontSize: 10 }}>
-              ✓ This email appears legitimate
-            </div>
-          )}
-
         </div>
 
-        {/* Sticky action bar */}
-        {!succeeded && !consequence && (
-          <div style={{ padding: '12px 24px', borderTop: '1px solid #1a1f2a', background: '#060a12', flexShrink: 0 }}>
-            {email.phishing ? (
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={handleVerifyNow} style={{
-                  flex: 1, padding: '10px 0', borderRadius: 6, cursor: 'pointer',
-                  background: '#1a3a8a', border: '1px solid #4466cc',
-                  color: '#88aaff', ...mono, fontSize: 11, letterSpacing: '0.05em',
-                }}>
-                  VERIFY NOW →
-                </button>
-                <button onClick={handleReportPhishing} style={{
-                  flex: 1, padding: '10px 0', borderRadius: 6, cursor: 'pointer',
-                  background: '#001a0f', border: '1px solid #00ff88',
-                  color: '#00ff88', ...mono, fontSize: 11, letterSpacing: '0.05em',
-                }}>
-                  [ REPORT PHISHING ]
-                </button>
-              </div>
-            ) : (
-              <div style={{ ...mono, fontSize: 11, color: '#3a3f4a', textAlign: 'center' }}>No action required</div>
+        {/* Action bar / feedback */}
+        {!outcome ? (
+          <div style={{ padding: '12px 22px', borderTop: '1px solid #2a2a2a', display: 'flex', gap: 10, background: '#202020', flexShrink: 0 }}>
+            {mail.maliciousLabel && (
+              <button onClick={handleMalicious} style={neutralDecisionButton}>{mail.maliciousLabel}</button>
             )}
+            {mail.attackId
+              ? <button onClick={handleSafe} style={neutralDecisionButton}>{mail.safeLabel}</button>
+              : <>
+                  <button onClick={handleSafe} style={neutralDecisionButton}>Report as phishing</button>
+                  <button onClick={handleArchive} style={neutralDecisionButton}>{mail.calibration ? 'Verify with IT & proceed' : 'Looks fine — archive'}</button>
+                </>}
           </div>
+        ) : (
+          <FeedbackBar mail={mail} outcome={outcome} />
         )}
       </div>
+    </div>
+  )
+}
+
+function FeedbackBar({ mail, outcome }: { mail: Mail; outcome: Outcome }) {
+  const good = outcome === 'pass' || outcome === 'archived'
+  const msg =
+    outcome === 'pass'   ? `Reported. The tell: ${mail.domainTip}.`
+  : outcome === 'fail'   ? (mail.attackId === 'ceo_fraud'
+      ? 'Wire sent to the attacker. BEC fingerprint: authority + extreme urgency + secrecy + a near-miss domain. Always confirm payments out-of-band.'
+      : 'Credentials captured on a spoofed login page. Always check the sender domain character-by-character before clicking.')
+  : outcome === 'fp'     ? (mail.calibration
+      ? 'That was a genuine IT notice — real domain, no link, and it points to the internal portal. Over-reporting real alerts causes alert fatigue and buries the actual threats. Verify before you escalate.'
+      : 'That email was legitimate. Over-reporting causes alert fatigue and buries the real threats — verify before you escalate.')
+  :                        (mail.calibration
+      ? 'Well judged. It looked urgent, but the domain was real, there was no link, and it pointed to the internal portal — you verified instead of panicking.'
+      : 'Archived. Correct — nothing suspicious here.')
+  return (
+    <div style={{ padding: '12px 22px', borderTop: `1px solid ${good ? 'rgba(0,255,136,0.3)' : 'rgba(255,51,85,0.3)'}`, background: good ? 'rgba(0,255,136,0.05)' : 'rgba(255,51,85,0.05)', flexShrink: 0 }}>
+      <div style={{ ...mono, fontSize: 10, letterSpacing: '0.12em', color: good ? colors.green : colors.red, marginBottom: 5 }}>
+        {outcome === 'pass' ? '✓ THREAT REPORTED' : outcome === 'archived' ? '✓ NO ACTION NEEDED' : outcome === 'fp' ? '⚠ FALSE POSITIVE' : '✕ SECURITY FAILURE'}
+      </div>
+      <div style={{ fontFamily: fonts.body, fontSize: 12.5, color: good ? '#a7f3d0' : '#ffb3bf', lineHeight: 1.6 }}>{msg}</div>
     </div>
   )
 }

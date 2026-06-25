@@ -18,6 +18,28 @@ if (typeof document !== 'undefined' && !document.getElementById('dial-kf')) {
 }
 
 const mono: React.CSSProperties = { fontFamily: "'JetBrains Mono',monospace" }
+const neutralDecisionButton: React.CSSProperties = {
+  flex: 1,
+  padding: 10,
+  borderRadius: 8,
+  background: 'transparent',
+  border: '1px solid rgba(0,240,255,0.28)',
+  color: '#e5e7eb',
+  fontFamily: "'Orbitron',sans-serif",
+  fontSize: 9,
+  cursor: 'pointer',
+  letterSpacing: '0.04em',
+}
+const neutralRoundDecisionButton: React.CSSProperties = {
+  width: 62,
+  height: 62,
+  borderRadius: '50%',
+  background: 'transparent',
+  border: '1px solid rgba(0,240,255,0.28)',
+  color: '#e5e7eb',
+  fontSize: 26,
+  cursor: 'pointer',
+}
 
 function speak(text: string) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return
@@ -37,7 +59,7 @@ const SCRIPT = [
   { t: 0,      key: 'greeting', text: "Hi, this is James from IT support. Am I speaking with you today?" },
   { t: 5000,   key: 'detect',   text: "We've detected your workstation is generating unusual network traffic — looks like a possible malware infection. I need to run a remote diagnostic." },
   { t: 12000,  key: 'mstsc',    text: "I just need you to press Windows+R, type 'mstsc', then read me the 9-digit code that appears. This gives our system secure read-only access." },
-  { t: 20000,  key: 'ticket',   text: "It's completely standard procedure. I can see your ticket number is IT-2024-9981 if you want to verify. Shall I stay on the line while you do this?" },
+  { t: 20000,  key: 'ticket',   text: "It's completely standard procedure. Do not call back through the help desk queue — they'll just route you back to me and we'll lose the containment window. I can see ticket IT-2024-9981 if you want to verify." },
 ]
 
 export default function DialerApp() {
@@ -135,12 +157,14 @@ export default function DialerApp() {
         <div className="phone-ring" style={{ fontSize: 52, marginBottom: 4 }}>📞</div>
         <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 15, color: '#e5e7eb', letterSpacing: '0.06em' }}>IT HELPDESK — EXT 4471</div>
         <div style={{ ...mono, fontSize: 12, color: '#6c7280' }}>Internal Extension</div>
+        <div style={{ ...mono, fontSize: 10, color: '#ffaa44', marginTop: 2 }}>Spoofed caller ID: internal labels can be faked</div>
+        <div style={{ ...mono, fontSize: 10, color: '#ff6688' }}>Do not call back, says caller</div>
         <div style={{ ...mono, fontSize: 10, color: '#3a3f4a', marginTop: 4 }}>Incoming call...</div>
         <div style={{ display: 'flex', gap: 28, marginTop: 24 }}>
           <button onClick={handleDecline}
-                  style={{ width: 62, height: 62, borderRadius: '50%', background: '#ff3355', border: 'none', fontSize: 26, cursor: 'pointer' }}>📵</button>
+                  style={neutralRoundDecisionButton}>📵</button>
           <button onClick={handleAnswer}
-                  style={{ width: 62, height: 62, borderRadius: '50%', background: '#00ff88', border: 'none', fontSize: 26, cursor: 'pointer' }}>📞</button>
+                  style={neutralRoundDecisionButton}>📞</button>
         </div>
       </div>
     )
@@ -170,7 +194,7 @@ export default function DialerApp() {
           <br /><br />
           The Windows+R → mstsc trick is a real vishing technique used against thousands of victims. IT departments never need you to read codes over the phone.
           <br /><br />
-          The ticket number "IT-2024-9981" sounded convincing — attackers research your systems beforehand.
+          The spoofed extension and ticket number "IT-2024-9981" sounded convincing — and the pressure not to call back officially was the tell.
         </div>
         <button onClick={handleUnderstood} style={{
           padding: '9px 28px', background: 'transparent', border: '1px solid #ff3355',
@@ -188,7 +212,8 @@ export default function DialerApp() {
           ✓ Correct! +120 pts<br />
           <span style={{ fontSize: 11, color: '#00cc66' }}>
             Red flags: unexpected call asking for remote access,<br />
-            pressure to act fast, requesting you to run commands.<br />
+            pressure to act fast, requesting you to run commands,<br />
+            and telling you not to call back officially.<br />
             Always hang up and call IT back on a number YOU look up.
           </span>
         </div>
@@ -202,6 +227,7 @@ export default function DialerApp() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 20 }}>
         <div style={{ fontSize: 44 }}>👤</div>
         <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, color: '#e5e7eb' }}>IT HELPDESK — EXT 4471</div>
+        <div style={{ ...mono, fontSize: 10, color: '#ffaa44' }}>Caller ID may be spoofed</div>
         <div style={{ ...mono, fontSize: 11, color: '#00ff88' }}>● Connected</div>
 
         {subtitle && (
@@ -230,18 +256,10 @@ export default function DialerApp() {
       {/* Final choices — appear after full script plays */}
       {choicesVisible && (
         <div style={{ padding: '12px 18px', borderTop: '1px solid #1a1f2a', display: 'flex', gap: 10, flexShrink: 0 }}>
-          <button onClick={handleProvideCode} style={{
-            flex: 1, padding: 10, borderRadius: 8, background: 'rgba(255,51,85,0.1)',
-            border: '1px solid #ff3355', color: '#ff6688',
-            fontFamily: "'Orbitron',sans-serif", fontSize: 9, cursor: 'pointer', letterSpacing: '0.04em',
-          }}>
+          <button onClick={handleProvideCode} style={neutralDecisionButton}>
             Read Out The Code
           </button>
-          <button onClick={handleHangUp} style={{
-            flex: 1, padding: 10, borderRadius: 8, background: '#001a0f',
-            border: '1px solid #00ff88', color: '#00ff88',
-            fontFamily: "'Orbitron',sans-serif", fontSize: 9, cursor: 'pointer',
-          }}>
+          <button onClick={handleHangUp} style={neutralDecisionButton}>
             Hang Up &amp; Report to IT
           </button>
         </div>
@@ -250,10 +268,7 @@ export default function DialerApp() {
       {/* Hang up always available */}
       {!choicesVisible && phase === 'active' && (
         <div style={{ padding: '12px 18px', borderTop: '1px solid #1a1f2a', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-          <button onClick={handleHangUp} style={{
-            width: 58, height: 58, borderRadius: '50%',
-            background: '#ff3355', border: 'none', fontSize: 22, cursor: 'pointer',
-          }}>📵</button>
+          <button onClick={handleHangUp} style={{ ...neutralRoundDecisionButton, width: 58, height: 58, fontSize: 22 }}>📵</button>
         </div>
       )}
     </div>

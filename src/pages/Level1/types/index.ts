@@ -9,7 +9,10 @@ export type GameEvent = {
   payload?: Record<string, unknown>
 }
 
-export type AppName = 'outlook' | 'browser' | 'fileExplorer' | 'messages' | 'dialer'
+export type AppName = 'outlook' | 'browser' | 'fileExplorer' | 'messages' | 'dialer' | 'defender'
+
+// Sub-attacks that unfold INSIDE the Main Workstation PC session (ATK_001).
+export type PcSubAttackId = 'email_phish' | 'ceo_fraud' | 'clickfix' | 'macro_doc' | 'fake_defender'
 
 export type TriggerOS = 'windows' | 'android' | 'scene'
 

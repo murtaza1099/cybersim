@@ -10,7 +10,13 @@ const vec3 = (value: Vec3) => value
 
 export const SCENE_PROPS = sceneConfig.props
 export const START_CAMERA = sceneConfig.startCamera
-export const CAMERA_LIMITS = sceneConfig.cameraLimits
+// Azimuth is unbounded so the camera spins a full, seamless circle (no hard stop
+// at the ±180° seam). JSON can't hold Infinity, so it's applied here instead.
+export const CAMERA_LIMITS = {
+  ...sceneConfig.cameraLimits,
+  minAzimuthAngle: -Infinity,
+  maxAzimuthAngle: Infinity,
+}
 
 export const ANCHORS = {
   PC_MONITOR_1: new THREE.Vector3(...hotspotById[1].anchorPosition),

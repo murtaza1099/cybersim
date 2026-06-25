@@ -7,8 +7,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
+node_modules/
+dist/
 dist-ssr
 *.local
 
@@ -34,4 +34,3 @@ dist-ssr
 *.3ds
 *.max
 public/studio_office_interior.glb
-src/simulation/level1/office final/public/studio_office_interior.glb

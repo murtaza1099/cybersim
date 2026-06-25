@@ -1,15 +1,26 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ActiveLayer, FocusMode, GameEvent } from '../types'
+import type { PcSubAttackResult } from '@/store/simulationStore'
+import { ATTACK_POINTS } from '../config/attacks'
 import { useAudioStore } from './audioStore'
 
 function sfx(name: string) {
   useAudioStore.getState().play(name)
 }
 
+// The real 3D hotspots in objective order — currently [1, 4, 5, 6, 7, 8].
+// (PC attacks 2 & 3 were merged into the Main Workstation, point 1.)
+const OBJECTIVE_IDS = ATTACK_POINTS.map(a => a.id)
+const OBJECTIVE_COUNT = OBJECTIVE_IDS.length
+
 function nextUnresolved(resolved: number[]): number {
-  for (let i = 1; i <= 8; i++) if (!resolved.includes(i)) return i
-  return 9
+  for (const id of OBJECTIVE_IDS) if (!resolved.includes(id)) return id
+  return 99 // sentinel — no hotspot matches once everything is resolved
+}
+
+function resolvedObjectives(completed: number[], failed: number[]): number {
+  return OBJECTIVE_IDS.filter(id => completed.includes(id) || failed.includes(id)).length
 }
 
 interface GameState {
@@ -25,6 +36,7 @@ interface GameState {
   reviewMode: boolean
   subtitleText: string | null
   lockedToastVisible: boolean
+  pcSubAttackResults: PcSubAttackResult[]
 }
 
 interface GameActions {
@@ -38,6 +50,8 @@ interface GameActions {
   closeOS: () => void
   exitToScene: () => void
   setSubtitle: (text: string, durationMs: number) => void
+  setPcSubAttackResults: (results: PcSubAttackResult[]) => void
+  reconcileObjective: () => void
   logEvent: (partial: Omit<GameEvent, 'id' | 'ts'>) => void
   resetGame: () => void
 }
@@ -57,11 +71,14 @@ export const useGameStore = create<GameState & GameActions>()(
       reviewMode: false,
       subtitleText: null,
       lockedToastVisible: false,
+      pcSubAttackResults: [],
 
       startPoint(id) {
         const { currentPointId, completedPoints, failedPoints } = get()
         const isReview = completedPoints.includes(id) || failedPoints.includes(id)
-        if (!isReview && id !== currentPointId) {
+        // Strict sequential: only the current objective opens; finish it to unlock the next.
+        const unlocked = isReview || id === currentPointId
+        if (!unlocked) {
           get().logEvent({ type: 'locked_attempt', pointId: id })
           // Softer cue — ARIA delivers the guidance now, so no harsh glitch.
           sfx('ui_hover')
@@ -157,14 +174,30 @@ export const useGameStore = create<GameState & GameActions>()(
 
       exitToScene() {
         const { completedPoints, failedPoints } = get()
-        const resolvedCount = new Set([...completedPoints, ...failedPoints]).size
-        set({ activePoint: null, focusMode: 'free', activeLayer: resolvedCount >= 8 ? 'complete' : 'scene', reviewMode: false })
+        const resolvedCount = resolvedObjectives(completedPoints, failedPoints)
+        set({ activePoint: null, focusMode: 'free', activeLayer: resolvedCount >= OBJECTIVE_COUNT ? 'complete' : 'scene', reviewMode: false })
         useAudioStore.getState().stopAllScenarioAudio()
       },
 
       setSubtitle(text, durationMs) {
         set({ subtitleText: text })
         setTimeout(() => set({ subtitleText: null }), durationMs)
+      },
+
+      setPcSubAttackResults(results) {
+        set({ pcSubAttackResults: results })
+      },
+
+      // Safe runtime heal (called once on mount): if a stale save left
+      // currentPointId on an objective that no longer has a hotspot, snap it back
+      // to the first unresolved objective so the right marker is clickable.
+      reconcileObjective() {
+        const { currentPointId, completedPoints, failedPoints } = get()
+        const completed = Array.isArray(completedPoints) ? completedPoints : []
+        const failed = Array.isArray(failedPoints) ? failedPoints : []
+        if (!OBJECTIVE_IDS.includes(currentPointId)) {
+          set({ currentPointId: nextUnresolved([...completed, ...failed]) })
+        }
       },
 
       logEvent(partial) {
@@ -193,6 +226,7 @@ export const useGameStore = create<GameState & GameActions>()(
           reviewMode: false,
           subtitleText: null,
           lockedToastVisible: false,
+          pcSubAttackResults: [],
         })
       },
     }),
@@ -205,6 +239,7 @@ export const useGameStore = create<GameState & GameActions>()(
         score: s.score,
         attempts: s.attempts,
         eventLog: s.eventLog.slice(-50),
+        pcSubAttackResults: s.pcSubAttackResults,
       }),
     }
   )

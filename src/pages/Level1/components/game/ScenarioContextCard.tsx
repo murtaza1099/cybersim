@@ -10,9 +10,7 @@ if (typeof document !== 'undefined' && !document.getElementById('scc-kf')) {
   s.textContent = `
     @keyframes sccIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     .scc-in { animation: sccIn 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-    .scc-action:hover  { filter: brightness(1.12); }
-    .scc-secondary:hover { background: rgba(0,255,136,0.10) !important; }
-    .scc-abort:hover   { color: #9ca3af !important; }
+    .scc-decision:hover { background: rgba(0,240,255,0.08) !important; }
   `
   document.head.appendChild(s)
 }
@@ -48,6 +46,21 @@ export default function ScenarioContextCard({ attackId, onProceed, onAbort }: Sc
   if (!attack) return null
 
   const accent = categoryColor(attack.id)
+  const neutralDecisionButton: React.CSSProperties = {
+    width: '100%',
+    padding: '11px 0',
+    borderRadius: 6,
+    background: 'transparent',
+    border: '1px solid rgba(0,240,255,0.28)',
+    color: '#e5e7eb',
+    fontFamily: "'Orbitron',sans-serif",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    transition: 'background 200ms ease',
+  }
 
   const handleProceed = () => {
     useAudioStore.getState().play('ui_click')
@@ -109,35 +122,19 @@ export default function ScenarioContextCard({ attackId, onProceed, onAbort }: Sc
         </p>
 
         {/* Primary action */}
-        <button className="scc-action" onClick={handleProceed} style={{
-          width: '100%', padding: '11px 0', borderRadius: 6,
-          background: '#00f0ff', border: 'none', color: '#050810',
-          fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer',
-          transition: 'filter 200ms ease',
-        }}>
+        <button className="scc-decision" onClick={handleProceed} style={neutralDecisionButton}>
           {attack.actionLabel ?? 'Proceed'} →
         </button>
 
         {/* Optional secondary (correct "do nothing" action) */}
         {attack.actionLabelSecondary && (
-          <button className="scc-secondary" onClick={handleSecondary} style={{
-            width: '100%', padding: '11px 0', borderRadius: 6, marginTop: 10,
-            background: 'transparent', border: '1px solid #00ff88', color: '#00ff88',
-            fontFamily: "'Orbitron',sans-serif", fontSize: 11, fontWeight: 700,
-            letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer',
-            transition: 'background 200ms ease',
-          }}>
+          <button className="scc-decision" onClick={handleSecondary} style={{ ...neutralDecisionButton, marginTop: 10 }}>
             {attack.actionLabelSecondary}
           </button>
         )}
 
         {/* Abort */}
-        <button className="scc-abort" onClick={handleAbort} style={{
-          width: '100%', marginTop: 14, background: 'transparent', border: 'none',
-          color: '#3a3f4a', fontFamily: "'JetBrains Mono',monospace", fontSize: 10,
-          letterSpacing: '0.12em', cursor: 'pointer', transition: 'color 200ms ease',
-        }}>
+        <button className="scc-decision" onClick={handleAbort} style={{ ...neutralDecisionButton, marginTop: 10 }}>
           [ STEP AWAY ]
         </button>
       </div>

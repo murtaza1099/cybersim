@@ -51,6 +51,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ap-kf')) {
   document.head.appendChild(s)
 }
 
+// Strict sequential: hotspots unlock one at a time, in order.
 function unlockState(id: number, completed: number[], current: number): 'completed' | 'current' | 'locked' {
   if (completed.includes(id)) return 'completed'
   if (id === current) return 'current'
@@ -59,11 +60,11 @@ function unlockState(id: number, completed: number[], current: number): 'complet
 
 interface Props {
   id: number
-  displayName: string
+  displayNumber: number   // sequential label shown on the marker (1..N)
   position: THREE.Vector3
 }
 
-const AnnotationPoint = memo(function AnnotationPoint({ id, displayName, position }: Props) {
+const AnnotationPoint = memo(function AnnotationPoint({ id, displayNumber, position }: Props) {
   const currentPointId  = useGameStore(s => s.currentPointId)
   const completedPoints = useGameStore(s => s.completedPoints)
   const startPoint      = useGameStore(s => s.startPoint)
@@ -121,7 +122,7 @@ const AnnotationPoint = memo(function AnnotationPoint({ id, displayName, positio
     opacity: farFuture ? 0.25 : 1,
     transition: 'background 400ms ease, border-color 400ms ease, opacity 400ms ease',
     ...(state === 'current'
-      ? { background: '#0a0e14', border: '2px solid #00f0ff', color: '#00f0ff', animation: 'glowPulseStrong 1.5s ease-in-out infinite' }
+      ? { background: '#0a0e14', border: '2px solid #00f0ff', color: '#00f0ff', boxShadow: '0 0 12px #00f0ff88, 0 0 24px #00f0ff44', animation: 'glowPulseStrong 0.55s ease-in-out 3' }
       : state === 'completed'
       ? { background: '#001a12', border: '1px solid #00ff88', color: '#00ff88' }
       : { background: '#0d1117', border: '1px solid #3a3f4a', color: '#3a3f4a', opacity: farFuture ? 0.2 : 0.5 }),
@@ -162,12 +163,12 @@ const AnnotationPoint = memo(function AnnotationPoint({ id, displayName, positio
         <div className="ap-marker" style={{ position: 'relative', display: 'inline-block' }} onClick={handleClick}>
           {locate && <span className="ap-locate-ring" />}
           <div style={bubble} className={isUnlocking ? 'ap-unlocking' : locate ? 'ap-locating' : ''}>
-            {id}
+            {displayNumber}
           </div>
           {locate && <div className="ap-here">▾ HERE</div>}
-          {/* Desk name only — revealed on hover, never the attack type */}
+          {/* Neutral prompt only — never the location or the attack type (no spoilers) */}
           {state !== 'locked' && (
-            <div className="ap-tooltip" style={tooltip}>{displayName}</div>
+            <div className="ap-tooltip" style={tooltip}>{state === 'completed' ? '✓ REVIEW' : '▸ INSPECT'}</div>
           )}
         </div>
         <div style={line} />

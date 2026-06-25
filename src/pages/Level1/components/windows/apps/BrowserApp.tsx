@@ -1,333 +1,203 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { useGameStore } from '../../../stores/gameStore'
-import { useCameraStore } from '../../../stores/cameraStore'
+import { usePcStore } from '../../../stores/pcStore'
+import { colors, fonts } from '../../../styles/theme'
 
-if (typeof document !== 'undefined' && !document.getElementById('br-kf')) {
-  const s = document.createElement('style')
-  s.id = 'br-kf'
-  s.textContent = `
-    @keyframes scaleIn { from { opacity:0; transform:scale(0.88) } to { opacity:1; transform:scale(1) } }
-    .popup-in { animation: scaleIn 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards }
-    @keyframes ptsMinus2 { 0%,100% { opacity:1 } 60% { opacity:0.3 } }
-    .pts-flash2 { animation: ptsMinus2 0.4s ease 3 }
-  `
-  document.head.appendChild(s)
-}
-
-const mono: React.CSSProperties = { fontFamily: "'JetBrains Mono',monospace" }
-
-// ─── Consequence overlay reusable ────────────────────────────────────────────
-function ConsequencePanel({ pts, text, onUnderstood }: { pts: string; text: string; onUnderstood: () => void }) {
-  return (
-    <div style={{
-      position: 'absolute', inset: 0, background: 'rgba(18,2,6,0.97)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      padding: '32px 40px', zIndex: 20,
-    }}>
-      <div className="pts-flash2" style={{ ...mono, fontSize: 22, color: '#ff3355', fontWeight: 700, marginBottom: 20, letterSpacing: '0.1em' }}>
-        {pts}
-      </div>
-      <div style={{ ...mono, fontSize: 10, color: '#ff335588', letterSpacing: '0.18em', marginBottom: 14 }}>
-        SECURITY FAILURE
-      </div>
-      <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: '#ff8899', lineHeight: 1.8, textAlign: 'center', maxWidth: 380, marginBottom: 28, whiteSpace: 'pre-line' }}>
-        {text}
-      </div>
-      <button onClick={onUnderstood} style={{
-        padding: '9px 28px', background: 'transparent', border: '1px solid #ff3355',
-        color: '#ff6688', ...mono, fontSize: 11, cursor: 'pointer', borderRadius: 4, letterSpacing: '0.08em',
-      }}>RETURN TO OFFICE</button>
-    </div>
-  )
-}
-
-// ─── ATK_002 — Fake Chrome Update ────────────────────────────────────────────
-function Point2() {
-  const [popupVisible, setPopupVisible]   = useState(false)
-  const [phase, setPhase]                 = useState<'popup' | 'warning' | 'done' | null>(null)
-  const [hoverUpdate, setHoverUpdate]     = useState(false)
-  const [countdown, setCountdown]         = useState(15)
-  const [consequence, setConsequence]     = useState<{ pts: string; text: string } | null>(null)
-  const countRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const completePoint = useGameStore(s => s.completePoint)
-  const failAttempt   = useGameStore(s => s.failAttempt)
-  const exitToScene   = useGameStore(s => s.exitToScene)
-
-  useEffect(() => {
-    const t = setTimeout(() => { setPopupVisible(true); setPhase('popup') }, 1500)
-    return () => clearTimeout(t)
-  }, [])
-
-  useEffect(() => {
-    if (phase === 'warning') {
-      setCountdown(15)
-      countRef.current = setInterval(() => {
-        setCountdown(c => {
-          if (c <= 1) {
-            clearInterval(countRef.current!)
-            return 0
-          }
-          return c - 1
-        })
-      }, 1000)
-    }
-    return () => { if (countRef.current) clearInterval(countRef.current) }
-  }, [phase])
-
-  const handleUpdate = (fromWarning = false) => {
-    failAttempt(2, fromWarning ? 'clicked_update_after_warning' : 'clicked_fake_update')
-    setPopupVisible(false)
-    setPhase(null)
-    setConsequence({
-      pts: '−10 PTS',
-      text: 'You ran a fake Chrome installer. This would have installed a keylogger on your machine.\n\nReal Chrome updates happen automatically in the background — you never need to click a popup or download anything manually to update Chrome.',
-    })
-  }
-
-  const handleNotNow = () => {
-    if (phase === 'popup') {
-      setPhase('warning')
-    } else if (phase === 'warning') {
-      clearInterval(countRef.current!)
-      setPopupVisible(false)
-      setPhase('done')
-      setTimeout(() => completePoint(2, 100), 600)
-    }
-  }
-
-  const handleUnderstood = () => {
-    exitToScene()
-    useCameraStore.getState().restoreInitial()
-  }
-
-  return (
-    <div style={{ position: 'relative', height: '100%', background: '#0a1020', overflow: 'hidden' }}>
-      {/* Fake browser content */}
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* Address bar */}
-        <div style={{ background: '#0d1525', borderBottom: '1px solid #1a2035', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f57' }} />
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ffbd2e' }} />
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#28c840' }} />
-          <div style={{ flex: 1, background: '#1a2035', borderRadius: 12, padding: '3px 12px', ...mono, fontSize: 11, color: '#6c7280' }}>
-            🔒 intranet.company.local/dashboard
-          </div>
-        </div>
-        {/* Page */}
-        <div style={{ flex: 1, padding: 28, color: '#9ca3af', fontFamily: "'DM Sans',sans-serif", overflowY: 'auto' }}>
-          <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 16, color: '#e5e7eb', marginBottom: 12 }}>Company Dashboard</div>
-          <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>Welcome back. Today's announcements:</p>
-          <div style={{ background: '#0d1525', border: '1px solid #1a2035', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
-            📋 Q2 planning documents uploaded to SharePoint
-          </div>
-          <div style={{ background: '#0d1525', border: '1px solid #1a2035', borderRadius: 6, padding: '12px 16px', fontSize: 13 }}>
-            🔧 Scheduled maintenance Friday 11pm–2am
-          </div>
-        </div>
-        {/* Status bar */}
-        <div style={{ background: '#070e1a', borderTop: '1px solid #1a2035', padding: '3px 14px', ...mono, fontSize: 10, color: hoverUpdate ? '#ff6644' : '#3a3f4a' }}>
-          {hoverUpdate ? '→ chrome-update-now.xyz/ChromeSetup_v124.exe' : 'Ready'}
-        </div>
-      </div>
-
-      {/* Chrome update popup */}
-      {popupVisible && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="popup-in" style={{
-            background: '#f8f9fa', borderRadius: 8, padding: 24, width: 360,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          }}>
-            {phase === 'popup' ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                  {/* Chrome icon approximation */}
-                  <svg width="32" height="32" viewBox="0 0 32 32">
-                    <circle cx="16" cy="16" r="15" fill="#4285f4" />
-                    <circle cx="16" cy="16" r="9" fill="white" />
-                    <circle cx="16" cy="16" r="6" fill="#4285f4" />
-                    <path d="M16 1 A15 15 0 0 1 29 8.5 L22 16 A9 9 0 0 0 16 7 Z" fill="#ea4335" />
-                    <path d="M29 8.5 A15 15 0 0 1 29 23.5 L22 16 A9 9 0 0 0 25 16 Z" fill="#fbbc05" />
-                    <path d="M29 23.5 A15 15 0 0 1 3 23.5 L10 16 A9 9 0 0 0 16 25 Z" fill="#34a853" />
-                  </svg>
-                  <div style={{ fontFamily: 'system-ui, sans-serif', fontSize: 16, fontWeight: 600, color: '#202124' }}>Chrome</div>
-                </div>
-                <div style={{ fontFamily: 'system-ui, sans-serif', fontSize: 14, color: '#3c4043', marginBottom: 8 }}>
-                  A critical update is available. Update now to stay protected.
-                </div>
-                <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#80868b', marginBottom: 18 }}>
-                  Current: 124.0.6367.78 → New: 124.0.6367.201
-                </div>
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                  <button onClick={handleNotNow} style={{ padding: '7px 16px', borderRadius: 4, border: 'none', background: 'transparent', color: '#1a73e8', fontFamily: 'system-ui', fontSize: 13, cursor: 'pointer' }}>
-                    Not now
-                  </button>
-                  <button
-                    onMouseEnter={() => setHoverUpdate(true)}
-                    onMouseLeave={() => setHoverUpdate(false)}
-                    onClick={() => handleUpdate(false)}
-                    style={{ padding: '7px 16px', borderRadius: 4, border: 'none', background: '#1a73e8', color: 'white', fontFamily: 'system-ui', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>
-                    Update Chrome
-                  </button>
-                </div>
-                <div style={{ fontFamily: 'system-ui', fontSize: 10, color: '#9aa0a6', marginTop: 10 }}>
-                  Updates are signed by Google LLC
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontFamily: 'system-ui', fontSize: 15, fontWeight: 600, color: '#d93025', marginBottom: 10 }}>
-                  ⚠ Are you sure?
-                </div>
-                <div style={{ fontFamily: 'system-ui', fontSize: 13, color: '#3c4043', marginBottom: 6, lineHeight: 1.6 }}>
-                  Your browser is currently vulnerable to known security exploits.
-                </div>
-                <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#d93025', marginBottom: 16 }}>
-                  Auto-closing in {countdown}s...
-                </div>
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                  <button onClick={handleNotNow} style={{ padding: '7px 16px', borderRadius: 4, border: 'none', background: 'transparent', color: '#1a73e8', fontFamily: 'system-ui', fontSize: 13, cursor: 'pointer' }}>
-                    I'll take the risk
-                  </button>
-                  <button
-                    onMouseEnter={() => setHoverUpdate(true)}
-                    onMouseLeave={() => setHoverUpdate(false)}
-                    onClick={() => handleUpdate(true)}
-                    style={{ padding: '7px 16px', borderRadius: 4, border: 'none', background: '#d93025', color: 'white', fontFamily: 'system-ui', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>
-                    Update Now
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-
-      {consequence && <ConsequencePanel {...consequence} onUnderstood={handleUnderstood} />}
-    </div>
-  )
-}
-
-// ─── ATK_003 — LinkedIn Scam ──────────────────────────────────────────────────
-function Point3() {
-  const [consequence, setConsequence] = useState<{ pts: string; text: string } | null>(null)
-  const [succeeded, setSucceeded]     = useState(false)
-  const [hoverFile, setHoverFile]     = useState(false)
-  const completePoint = useGameStore(s => s.completePoint)
-  const failAttempt   = useGameStore(s => s.failAttempt)
-  const exitToScene   = useGameStore(s => s.exitToScene)
-
-  const handleDownload = () => {
-    failAttempt(3, 'opened_exe')
-    setConsequence({
-      pts: '−10 PTS',
-      text: 'You ran a .exe file disguised as a PDF. Attackers use double extensions (.pdf.exe) knowing most operating systems hide the final extension by default.\n\nThe attachment was a Remote Access Trojan (RAT) that would have given the attacker full control of your machine.',
-    })
-  }
-
-  const handleIgnore = () => {
-    setSucceeded(true)
-    setTimeout(() => completePoint(3, 100), 600)
-  }
-
-  const handleUnderstood = () => {
-    exitToScene()
-    useCameraStore.getState().restoreInitial()
-  }
-
-  return (
-    <div style={{ position: 'relative', height: '100%', background: '#0a1020', overflow: 'hidden' }}>
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* Address bar */}
-        <div style={{ background: '#0d1525', borderBottom: '1px solid #1a2035', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f57' }} />
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ffbd2e' }} />
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#28c840' }} />
-          <div style={{ flex: 1, background: '#1a2035', borderRadius: 12, padding: '3px 12px', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#6c7280' }}>
-            🔒 www.linkedin.com/messaging
-          </div>
-        </div>
-
-        {/* LinkedIn UI */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 80px' }}>
-          {/* Header */}
-          <div style={{ background: '#0077b5', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontFamily: 'system-ui', fontSize: 18, fontWeight: 700, color: 'white', letterSpacing: '-0.5px' }}>in</div>
-            <div style={{ fontFamily: 'system-ui', fontSize: 14, color: 'white', fontWeight: 600 }}>Messaging</div>
-          </div>
-
-          {/* Message */}
-          <div style={{ padding: '20px 16px', maxWidth: 560, margin: '0 auto' }}>
-            <div style={{ background: '#0d1525', borderRadius: 10, padding: 20, border: '1px solid #1a2a3a' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#1a3a5a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>👤</div>
-                <div>
-                  <div style={{ color: '#e5e7eb', fontWeight: 600, fontSize: 14, fontFamily: 'system-ui' }}>Sarah Chen 🔗</div>
-                  <div style={{ color: '#6c7280', fontSize: 12, fontFamily: 'system-ui' }}>Strategic Recruiter at McKinsey & Company</div>
-                  <div style={{ color: '#4a9c74', fontSize: 11, fontFamily: 'system-ui' }}>✓ 500+ connections</div>
-                </div>
-              </div>
-
-              <div style={{ color: '#9ca3af', fontSize: 13, lineHeight: 1.75, marginBottom: 16, fontFamily: "'DM Sans',sans-serif" }}>
-                Hi! I came across your profile and was immediately impressed. We have an exciting Senior Analyst role that's a perfect fit — 40% salary increase, remote-first, equity package.
-                <br /><br />
-                I have 2 other candidates interviewing this week, so I need to know by Friday. Please download our role brief and complete the quick skills assessment:
-              </div>
-
-              {/* Attachment */}
-              <div
-                onMouseEnter={() => setHoverFile(true)}
-                onMouseLeave={() => setHoverFile(false)}
-                style={{ background: '#06080f', border: `1px solid ${hoverFile ? '#ff3355' : '#1a2a3a'}`, borderRadius: 6, padding: '10px 14px', marginBottom: 16, cursor: 'pointer', transition: 'border-color 0.2s' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>📎</span>
-                  <div>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: hoverFile ? '#ff6688' : '#e5e7eb' }}>
-                      Role_Brief_McKinsey.pdf.exe
-                    </div>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6c7280', marginTop: 2 }}>
-                      1.2 MB · {hoverFile ? '⚠ .exe — this is an executable program' : 'PDF Document'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ color: '#9ca3af', fontSize: 13, lineHeight: 1.6, fontFamily: "'DM Sans',sans-serif" }}>
-                Looking forward to connecting! 🌟
-              </div>
-
-              {!succeeded && !consequence && (
-                <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-                  <button onClick={handleDownload} style={{
-                    flex: 1, padding: '10px 0', borderRadius: 6, cursor: 'pointer',
-                    background: '#0077b5', border: 'none', color: 'white',
-                    fontFamily: 'system-ui', fontSize: 13, fontWeight: 600,
-                  }}>
-                    Download & Complete Assessment
-                  </button>
-                  <button onClick={handleIgnore} style={{
-                    flex: 1, padding: '10px 0', borderRadius: 6, cursor: 'pointer',
-                    background: 'transparent', border: '1px solid #00ff88',
-                    color: '#00ff88', fontFamily: "'Orbitron',sans-serif", fontSize: 10,
-                  }}>
-                    [ IGNORE & MARK SUSPICIOUS ]
-                  </button>
-                </div>
-              )}
-
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {consequence && <ConsequencePanel {...consequence} onUnderstood={handleUnderstood} />}
-    </div>
-  )
-}
+const mono: CSSProperties = { fontFamily: fonts.mono }
 
 export default function BrowserApp() {
   const activePoint = useGameStore(s => s.activePoint)
-  if (activePoint === 2) return <Point2 />
-  if (activePoint === 3) return <Point3 />
-  return null
+  const firedClickfix = usePcStore(s => Boolean(s.fired.clickfix))
+  const clickfixStatus = usePcStore(s => s.attacks.clickfix?.status ?? 'pending')
+
+  if (activePoint !== 1) return <CompanyPortal />
+  if (firedClickfix || clickfixStatus !== 'pending') return <ClickFix />
+  return <CompanyPortal />
+}
+
+function CompanyPortal() {
+  return (
+    <BrowserShell url="https://portal.techcorp.local/home" status="Ready">
+      <div style={{ padding: 24, color: '#d7dee9', fontFamily: fonts.body }}>
+        <div style={{ ...mono, fontSize: 10, color: colors.cyan, letterSpacing: '0.14em', marginBottom: 8 }}>TECHCORP INTRANET</div>
+        <h1 style={{ margin: 0, fontFamily: fonts.display, fontSize: 20, color: '#f3f4f6' }}>Company Portal</h1>
+        <p style={{ margin: '10px 0 18px', maxWidth: 500, fontSize: 13, lineHeight: 1.7, color: '#aeb9c8' }}>
+          Welcome back. Your security dashboard, HR links, and team notices are available below.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+          <PortalTile title="Security Center" body="No urgent action required. Review alerts before following instructions." />
+          <PortalTile title="Company News" body="Quarterly updates, policy reminders, and internal announcements." />
+          <PortalTile title="People Tools" body="Directory, payroll, leave requests, and onboarding resources." />
+          <PortalTile title="Support" body="Open a ticket or call the internal help desk for verified IT requests." />
+        </div>
+      </div>
+    </BrowserShell>
+  )
+}
+
+function PortalTile({ title, body }: { title: string; body: string }) {
+  return (
+    <div style={{ border: '1px solid rgba(76,194,255,0.14)', background: 'rgba(255,255,255,0.035)', borderRadius: 7, padding: 14, minHeight: 92 }}>
+      <div style={{ fontFamily: fonts.display, fontSize: 12, color: '#edf6ff', marginBottom: 7 }}>{title}</div>
+      <div style={{ fontFamily: fonts.body, fontSize: 12.5, lineHeight: 1.55, color: '#9ba8ba' }}>{body}</div>
+    </div>
+  )
+}
+
+function ClickFix() {
+  const attacks = usePcStore(s => s.attacks)
+  const recordInspection = usePcStore(s => s.recordInspection)
+  const resolveAttack = usePcStore(s => s.resolveAttack)
+  const status = attacks.clickfix?.status ?? 'pending'
+  const [details, setDetails] = useState(false)
+
+  const inspect = () => {
+    setDetails(true)
+    recordInspection('clickfix', 'command')
+  }
+  const runCommand = () => resolveAttack('clickfix', false, 'ran_command')
+  const reportPage = () => resolveAttack('clickfix', true, 'reported_clickfix')
+
+  if (status === 'passed') {
+    return (
+      <BrowserShell url="https://chrome-browser-security.com/update" status="Suspicious download reported">
+        <ResultPanel
+          tone="good"
+          title="Threat Reported"
+          body="Correct. Real Chrome updates come through Chrome itself or google.com. A padlock only means the wrong site has HTTPS; it does not make ChromeSetup.exe safe."
+        />
+      </BrowserShell>
+    )
+  }
+
+  if (status === 'failed') {
+    return (
+      <BrowserShell url="https://chrome-browser-security.com/update" status="ChromeSetup.exe executed">
+        <ResultPanel
+          tone="bad"
+          title="Security Failure"
+          body="ChromeSetup.exe was served from a non-Google domain. Fake update installers commonly drop remote access malware while pretending to repair a browser."
+        />
+      </BrowserShell>
+    )
+  }
+
+  return (
+    <BrowserShell url="https://chrome-browser-security.com/update" status={details ? 'Domain is not google.com' : 'Download offered from download.chromesecurity-updates.com'}>
+      <div style={{ minHeight: '100%', background: '#f7f8fb', color: '#202124', fontFamily: 'system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
+        <div style={{ width: 430, border: '1px solid #d7dce5', borderRadius: 8, background: '#fff', boxShadow: '0 10px 30px rgba(20,25,40,0.18)', padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'conic-gradient(#4285f4 0 25%, #34a853 0 50%, #fbbc05 0 75%, #ea4335 0)', border: '2px solid #fff', boxShadow: '0 0 0 1px #d7dce5' }} />
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 650 }}>Chrome update required</div>
+              <div style={{ fontSize: 12, color: '#5f6368', marginTop: 2 }}>Your browser is out of date. Install the security update to continue.</div>
+            </div>
+          </div>
+
+          <div style={{ border: '1px solid #e0e3ea', borderRadius: 6, padding: 14, marginBottom: 14, background: '#fafbff' }}>
+            <div style={{ fontSize: 13, color: '#3c4043', lineHeight: 1.55, marginBottom: 12 }}>
+              This site is using HTTPS and says the update is signed by Google LLC. The address bar, however, is not on a Google-owned host.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '7px 10px', fontSize: 12 }}>
+              <span style={{ color: '#5f6368' }}>File</span><strong>ChromeSetup.exe</strong>
+              <span style={{ color: '#5f6368' }}>Source</span><code style={{ color: '#b42318', fontSize: 11 }}>download.chromesecurity-updates.com</code>
+              <span style={{ color: '#5f6368' }}>Publisher</span><span>Google LLC (unverified)</span>
+            </div>
+          </div>
+
+          <button onClick={runCommand} style={primaryButton}>
+            Download ChromeSetup.exe
+          </button>
+          <button onClick={reportPage} style={safeButton}>
+            Report suspicious download
+          </button>
+          <button onClick={inspect} style={inspectButton}>
+            Inspect domain and certificate
+          </button>
+
+          {details && (
+            <div style={{ ...mono, marginTop: 12, fontSize: 11, color: '#9a3412', lineHeight: 1.6, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 5, padding: 9 }}>
+              Warning: the padlock belongs to chrome-browser-security.com, not google.com or chrome.google.com. The installer is downloaded from a second non-Google host.
+            </div>
+          )}
+        </div>
+      </div>
+    </BrowserShell>
+  )
+}
+
+function ResultPanel({ tone, title, body }: { tone: 'good' | 'bad'; title: string; body: string }) {
+  const good = tone === 'good'
+  const accent = good ? colors.green : colors.red
+  return (
+    <div style={{ height: '100%', minHeight: 330, background: good ? '#061711' : '#1a0508', color: '#f3f4f6', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
+      <div style={{ ...mono, fontSize: 11, color: accent, letterSpacing: '0.16em', marginBottom: 10 }}>{good ? 'CORRECT DECISION' : 'ATTACK EXECUTED'}</div>
+      <div style={{ fontFamily: fonts.display, fontSize: 18, color: '#f8fafc', marginBottom: 10 }}>{title}</div>
+      <div style={{ fontFamily: fonts.body, fontSize: 13, color: good ? '#a7f3d0' : '#ffb3bf', lineHeight: 1.7, maxWidth: 460 }}>{body}</div>
+    </div>
+  )
+}
+
+function BrowserShell({ url, status, children }: { url: string; status: string; children: React.ReactNode }) {
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#0a1020', overflow: 'hidden' }}>
+      <div style={{ height: 43, flexShrink: 0, background: '#101827', borderBottom: '1px solid #202a3f', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px' }}>
+        <span style={trafficDot('#ff5f57')} />
+        <span style={trafficDot('#ffbd2e')} />
+        <span style={trafficDot('#28c840')} />
+        <div style={{ flex: 1, minWidth: 0, background: '#182235', border: '1px solid #2a3851', borderRadius: 16, padding: '5px 12px', ...mono, fontSize: 11, color: '#aab5c4', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          🔒 {url}
+        </div>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{children}</div>
+      <div style={{ height: 24, flexShrink: 0, background: '#070d17', borderTop: '1px solid #182235', display: 'flex', alignItems: 'center', padding: '0 12px', ...mono, fontSize: 10, color: '#718096' }}>
+        {status}
+      </div>
+    </div>
+  )
+}
+
+const trafficDot = (background: string): CSSProperties => ({
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+  background,
+  flexShrink: 0,
+})
+
+const primaryButton: CSSProperties = {
+  width: '100%',
+  padding: '10px 0',
+  borderRadius: 5,
+  border: '1px solid #bdc1c6',
+  background: 'transparent',
+  color: '#202124',
+  fontSize: 13,
+  fontWeight: 650,
+  cursor: 'pointer',
+  marginBottom: 8,
+}
+
+const safeButton: CSSProperties = {
+  width: '100%',
+  padding: '10px 0',
+  borderRadius: 5,
+  border: '1px solid #bdc1c6',
+  background: 'transparent',
+  color: '#202124',
+  fontSize: 13,
+  fontWeight: 650,
+  cursor: 'pointer',
+  marginBottom: 8,
+}
+
+const inspectButton: CSSProperties = {
+  width: '100%',
+  padding: '5px 0',
+  border: 'none',
+  background: 'transparent',
+  color: '#5f6368',
+  fontSize: 12,
+  cursor: 'pointer',
+  textDecoration: 'underline',
 }

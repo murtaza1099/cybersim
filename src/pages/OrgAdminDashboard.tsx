@@ -629,6 +629,23 @@ function AnalyticsTab({ employees, orgId }: { employees: Employee[]; orgId: stri
           {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
         {emp && <ThreatRadarChart scores={emp.moduleProgress} />}
+
+        {emp?.level1Result?.pcSubAttackResults?.length ? (
+          <div className="mt-5">
+            <h4 className="font-display text-xs tracking-wider text-text-secondary mb-3">PC WORKSTATION — SUB-ATTACK BREAKDOWN</h4>
+            <div className="space-y-1.5">
+              {emp.level1Result.pcSubAttackResults.map(r => (
+                <div key={r.id} className="flex items-center gap-2 text-sm">
+                  <span style={{ color: r.passed ? '#00ff88' : '#ff3355' }}>{r.passed ? '✓' : '✕'}</span>
+                  <span className="text-text-primary flex-1">{r.label}</span>
+                  <span className="font-mono text-xs" style={{ color: r.passed ? '#00ff88' : '#ff3355' }}>
+                    {r.passed ? 'PASS' : 'FAILED'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </GlassCard>
     </motion.div>
   );

@@ -1,12 +1,22 @@
 import { create } from 'zustand';
 import { ATTACK_MODULES } from '@/data/mockData';
 
+// Per-PC-sub-attack outcome from the Main Workstation session, so Org Admin
+// analytics can show which specific threat an employee failed (e.g. BEC) rather
+// than a lumped "PC attacks: 60%".
+export interface PcSubAttackResult {
+  id: string;
+  label: string;
+  passed: boolean;
+}
+
 export interface Level1Result {
   score: number;
   status: 'completed' | 'failed' | 'in-progress';
   completedAttacks?: number;
   failedAttacks?: number;
   completedAt?: string;
+  pcSubAttackResults?: PcSubAttackResult[];
 }
 
 interface SimulationState {

@@ -101,15 +101,14 @@ export default function ScoreHUD() {
         }} />
       </div>
       <div style={{ fontFamily: fonts.mono, fontSize: 9, color: 'rgba(156,163,175,0.7)', marginBottom: 6 }}>
-        OBJ: {completedPoints.length} / 8
+        OBJ: {completedPoints.filter(id => ATTACK_POINTS.some(a => a.id === id)).length} / {ATTACK_POINTS.length}
       </div>
       <div style={{ display: 'flex', gap: 3 }}>
-        {Array.from({ length: 8 }, (_, i) => {
-          const id = i + 1
-          const isDone    = completedPoints.includes(id)
-          const isCurrent = id === currentPointId && !isDone
+        {ATTACK_POINTS.map(a => {
+          const isDone    = completedPoints.includes(a.id)
+          const isCurrent = a.id === currentPointId && !isDone
           return (
-            <div key={id} style={{
+            <div key={a.id} style={{
               flex: 1, height: 3, borderRadius: 2,
               background: isDone ? colors.green : isCurrent ? colors.cyan : '#1a2030',
               boxShadow: isCurrent ? `0 0 6px ${colors.cyan}` : 'none',

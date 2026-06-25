@@ -13,18 +13,17 @@ const STEPS = [
   { icon: Lock,   label: 'ARMING THREAT VECTORS',     t: 2600 },
   { icon: Shield, label: 'READY — ENTERING SIMULATION', t: 4000 },
 ]
-const DISMISS_AT = 5400   // simulation has been mounting for this entire duration
-
-function Level1Loader({ onDone }: { onDone: () => void }) {
+function Level1Loader({ ready }: { ready: boolean }) {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
-    const timers = [
-      ...STEPS.slice(1).map((s, i) => setTimeout(() => setStep(i + 1), s.t)),
-      setTimeout(onDone, DISMISS_AT),
-    ]
+    const timers = STEPS.slice(1, -1).map((s, i) => setTimeout(() => setStep(i + 1), s.t))
     return () => timers.forEach(clearTimeout)
-  }, [onDone])
+  }, [])
+
+  useEffect(() => {
+    if (ready) setStep(STEPS.length - 1)
+  }, [ready])
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050810]"
@@ -79,6 +78,7 @@ function Level1Loader({ onDone }: { onDone: () => void }) {
 export default function Level1Route() {
   const navigate = useNavigate()
   const [showLoader, setShowLoader] = useState(true)
+  const [simulationReady, setSimulationReady] = useState(false)
   const userId = useAuthStore(s => s.userId)
   const completeEmployeeLevel1 = useDataStore(s => s.completeLevel1)
   const completeSessionLevel1 = useSimulationStore(s => s.completeLevel1)
@@ -92,15 +92,19 @@ export default function Level1Route() {
     navigate('/dashboard')
   }, [completeEmployeeLevel1, completeSessionLevel1, navigate, userId])
 
+  useEffect(() => {
+    if (simulationReady) setShowLoader(false)
+  }, [simulationReady])
+
   return (
     <>
       {/* Simulation mounts immediately and loads in background while loader is visible */}
-      <Level1Simulation onExit={handleExit} />
+      <Level1Simulation onExit={handleExit} onSceneReady={() => setSimulationReady(true)} />
 
       <AnimatePresence>
         {showLoader && (
           <motion.div key="loader" exit={{ opacity: 0 }} transition={{ duration: 0.6 }}>
-            <Level1Loader onDone={() => setShowLoader(false)} />
+            <Level1Loader ready={simulationReady} />
           </motion.div>
         )}
       </AnimatePresence>

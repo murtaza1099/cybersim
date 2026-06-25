@@ -1,8 +1,8 @@
 {
-  "startCamera": { "position": [-8.72, 2, 2.49], "target": [0.5, 0.9, 0.5], "fov": 56 },
+  "startCamera": { "position": [-5.59, 1.77, -1.1], "target": [0.5, 0.9, 0.5], "fov": 40 },
   "cameraLimits": {
-    "minDistance": 0.5,
-    "maxDistance": 9.5,
+    "minDistance": 1.5,
+    "maxDistance": 6.4,
     "minPolarAngle": 0.7086036763096978,
     "maxPolarAngle": 1.7139133254584316,
     "minAzimuthAngle": -3.141592653589793,
