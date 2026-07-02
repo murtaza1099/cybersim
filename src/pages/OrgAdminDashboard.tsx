@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, BarChart3, Download, CheckCircle, Trophy, Target, Search, Plus, X, Eye, EyeOff, Copy, Check, ChevronDown, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { LayoutDashboard, Users, BarChart3, Download, CheckCircle, Trophy, Target, Search, Plus, X, Copy, Check, ChevronDown, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useDataStore, type Employee } from '@/store/dataStore';
+import { useOrganizations, useEmployees } from '@/hooks/useOrgData';
+import { useLiveAnalytics } from '@/hooks/useLiveAnalytics';
 import { DashboardSidebar } from '@/components/layout/Sidebar';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/StatCard';
@@ -13,8 +16,8 @@ import { ModulePerformanceChart } from '@/components/charts/ModulePerformanceCha
 import { TrainingProgressDonut } from '@/components/charts/TrainingProgressDonut';
 import { PerformanceHeatmap } from '@/components/charts/PerformanceHeatmap';
 import { ThreatRadarChart } from '@/components/charts/ThreatRadarChart';
+import { LiveActivityPanel } from '@/components/analytics/LiveActivityPanel';
 import { ATTACK_MODULES } from '@/data/mockData';
-import { maskKey } from '@/utils/keyParser';
 import { timeAgo } from '@/utils/formatters';
 
 const tabs = [
@@ -28,11 +31,23 @@ export default function OrgAdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const { userName, orgId, logout } = useAuthStore();
   const navigate = useNavigate();
-  const handleLogout = () => { logout(); navigate('/'); };
-  const organizations = useDataStore(s => s.organizations);
-  const allEmployees = useDataStore(s => s.employees);
-  const org = useMemo(() => organizations.find(o => o.id === (orgId || '')), [organizations, orgId]);
-  const orgEmployees = useMemo(() => allEmployees.filter(e => e.orgId === (orgId || '')), [allEmployees, orgId]);
+  const handleLogout = async () => { await logout(); navigate('/'); };
+
+  const orgsQuery = useOrganizations();
+  const empsQuery = useEmployees(orgId || undefined);
+  const isLoading = orgsQuery.isLoading || empsQuery.isLoading;
+  const isError = orgsQuery.isError || empsQuery.isError;
+  useLiveAnalytics(orgId || undefined);
+
+  const org = useMemo(() => orgsQuery.organizations.find(o => o.id === (orgId || '')), [orgsQuery.organizations, orgId]);
+  const orgEmployees = useMemo(
+    () => empsQuery.employees.filter(e => e.orgId === (orgId || '')),
+    [empsQuery.employees, orgId],
+  );
+
+  useEffect(() => {
+    if (isError) toast.error('Failed to load organization data.');
+  }, [isError]);
 
   return (
     <div className="min-h-screen bg-[hsl(var(--bg-void))] flex justify-center">
@@ -59,10 +74,26 @@ export default function OrgAdminDashboard() {
           <span className="font-mono text-[10px] text-text-muted">{org?.name || 'Organization'}</span>
         </div>
         <div className="p-8">
-          {activeTab === 'overview' && <OverviewTab employees={orgEmployees} orgId={orgId || ''} />}
-          {activeTab === 'employees' && <EmployeesTab employees={orgEmployees} orgId={orgId || ''} />}
-          {activeTab === 'analytics' && <AnalyticsTab employees={orgEmployees} orgId={orgId || ''} />}
-          {activeTab === 'export' && <ExportTab employees={orgEmployees} />}
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 text-text-muted">
+              <Loader2 className="w-8 h-8 animate-spin text-cyan mb-3" />
+              <span className="font-display text-sm tracking-wider">Loading organization data…</span>
+            </div>
+          ) : isError ? (
+            <GlassCard className="text-center py-16">
+              <AlertTriangle className="w-10 h-10 text-red mx-auto mb-4" />
+              <h3 className="font-display text-lg text-text-primary mb-2">Couldn’t load data</h3>
+              <p className="text-text-secondary text-sm mb-4">There was a problem reaching the database.</p>
+              <NeonButton size="sm" onClick={() => window.location.reload()}>Retry</NeonButton>
+            </GlassCard>
+          ) : (
+            <>
+              {activeTab === 'overview' && <OverviewTab employees={orgEmployees} orgId={orgId || ''} />}
+              {activeTab === 'employees' && <EmployeesTab employees={orgEmployees} orgId={orgId || ''} />}
+              {activeTab === 'analytics' && <AnalyticsTab employees={orgEmployees} orgId={orgId || ''} />}
+              {activeTab === 'export' && <ExportTab employees={orgEmployees} />}
+            </>
+          )}
         </div>
       </main>
       </div>
@@ -89,6 +120,8 @@ function OverviewTab({ employees, orgId }: { employees: Employee[]; orgId: strin
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       <h1 className="font-display font-bold text-2xl text-text-primary mb-8">Organization Overview</h1>
+
+      <LiveActivityPanel />
 
       <div className="grid grid-cols-4 gap-4 mb-8">
         <StatCard icon={Users} value={employees.length} label="Total Employees" color="cyan" delay={0} />
@@ -155,15 +188,14 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
   const [search, setSearch] = useState('');
   const [showPanel, setShowPanel] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newJobRole, setNewJobRole] = useState('');
   const [newAge, setNewAge] = useState('');
   const [newGender, setNewGender] = useState('');
-  const [generatedKey, setGeneratedKey] = useState('');
-  const [keyCopied, setKeyCopied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [credCopied, setCredCopied] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
   const [bulkImportParsed, setBulkImportParsed] = useState<Array<Record<string, string>>>([]);
@@ -175,30 +207,26 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
     e.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  const revealKey = (id: string) => {
-    setRevealedKeys(p => ({ ...p, [id]: true }));
-    setTimeout(() => setRevealedKeys(p => ({ ...p, [id]: false })), 5000);
-  };
-
-  const copyKey = (id: string, key: string) => {
-    navigator.clipboard.writeText(key);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const handleAddEmployee = (e: React.FormEvent) => {
+  const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newEmail.trim()) return;
     const age = newAge ? parseInt(newAge, 10) : undefined;
-    const key = addEmployee(
-      newName.trim(),
-      newEmail.trim(),
-      orgId,
-      newJobRole || undefined,
-      age,
-      newGender || undefined
-    );
-    setGeneratedKey(key);
+    setSubmitting(true);
+    try {
+      const creds = await addEmployee(
+        newName.trim(),
+        newEmail.trim(),
+        orgId,
+        newJobRole || undefined,
+        age,
+        newGender || undefined
+      );
+      setCredentials(creds);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not create employee');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClosePanel = () => {
@@ -208,8 +236,8 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
     setNewJobRole('');
     setNewAge('');
     setNewGender('');
-    setGeneratedKey('');
-    setKeyCopied(false);
+    setCredentials(null);
+    setCredCopied(false);
   };
 
   const parseCSV = (csv: string): Array<Record<string, string>> => {
@@ -255,27 +283,31 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
     URL.revokeObjectURL(url);
   };
 
-  const handleBulkImportConfirm = () => {
+  const handleBulkImportConfirm = async () => {
     let imported = 0;
     let failed = 0;
-    
-    bulkImportParsed.forEach(row => {
+
+    for (const row of bulkImportParsed) {
       const name = row.name?.trim();
       const email = row.email?.trim();
-      
+
       if (!name || !email) {
         failed++;
-        return;
+        continue;
       }
-      
+
       const age = row.age ? parseInt(row.age, 10) : undefined;
       const jobRole = row.jobrole || row['job role'] || row['job_role'] || undefined;
       const gender = row.gender || undefined;
-      
-      addEmployee(name, email, orgId, jobRole, age, gender);
-      imported++;
-    });
-    
+
+      try {
+        await addEmployee(name, email, orgId, jobRole, age, gender);
+        imported++;
+      } catch {
+        failed++;
+      }
+    }
+
     setBulkImportResult({ imported, failed });
     setBulkImportFile(null);
     setBulkImportParsed([]);
@@ -320,7 +352,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-elevated">
-                {['Name', 'Email', 'Role', 'Age', 'Gender', 'Key', 'Level', 'Last Active', 'Status', ''].map(h => (
+                {['Name', 'Email', 'Role', 'Age', 'Gender', 'Level', 'Last Active', 'Status', ''].map(h => (
                   <th key={h} className="text-left p-3 text-text-muted font-display text-[10px] tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -345,15 +377,6 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
                       <td className="p-3 text-text-secondary">{emp.age || '—'}</td>
                       <td className="p-3 text-text-secondary">{emp.gender || '—'}</td>
                       <td className="p-3">
-                        <span className="font-mono text-xs text-text-muted">{revealedKeys[emp.id] ? emp.empKey : maskKey(emp.empKey)}</span>
-                        <button onClick={(e) => { e.stopPropagation(); revealKey(emp.id); }} className="ml-1 text-text-muted hover:text-cyan">
-                          {revealedKeys[emp.id] ? <EyeOff className="w-3 h-3 inline" /> : <Eye className="w-3 h-3 inline" />}
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); copyKey(emp.id, emp.empKey); }} className="ml-1 text-text-muted hover:text-cyan">
-                          {copiedId === emp.id ? <Check className="w-3 h-3 inline text-green" /> : <Copy className="w-3 h-3 inline" />}
-                        </button>
-                      </td>
-                      <td className="p-3">
                         <div className="flex gap-0.5">
                           {[1, 2, 3].map(l => (
                             <div key={l} className={`w-6 h-1.5 rounded-full ${emp.level >= l ? 'bg-green' : 'bg-elevated'}`} />
@@ -368,7 +391,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
                     <AnimatePresence>
                       {expandedId === emp.id && (
                         <tr>
-                          <td colSpan={7}>
+                          <td colSpan={9}>
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: 'auto', opacity: 1 }}
@@ -425,7 +448,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
                 <button onClick={handleClosePanel} className="text-text-muted hover:text-text-primary"><X className="w-5 h-5" /></button>
               </div>
 
-              {!generatedKey ? (
+              {!credentials ? (
                 <form onSubmit={handleAddEmployee}>
                   <label className="block mb-4">
                     <span className="font-display text-[10px] tracking-[0.2em] text-cyan mb-1 block">FULL NAME</span>
@@ -487,21 +510,28 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
                       <option value="Prefer not to say">Prefer not to say</option>
                     </select>
                   </label>
-                  <NeonButton type="submit" className="w-full" size="lg">Generate Access Key</NeonButton>
+                  <NeonButton type="submit" className="w-full" size="lg" loading={submitting}>Create Account</NeonButton>
                 </form>
               ) : (
                 <div>
-                  <p className="text-text-secondary text-sm mb-4">Employee <span className="text-text-primary font-semibold">{newName}</span> added!</p>
-                  <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">EMPLOYEE ACCESS KEY</label>
+                  <p className="text-text-secondary text-sm mb-4">Employee <span className="text-text-primary font-semibold">{newName}</span> added! Share these sign-in credentials.</p>
+                  <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">EMAIL</label>
+                  <div className="bg-elevated border border-border rounded-lg px-4 py-3 mb-3">
+                    <code className="font-mono text-sm text-text-primary break-all">{credentials.email}</code>
+                  </div>
+                  <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">TEMPORARY PASSWORD</label>
                   <div className="flex items-center gap-2 bg-elevated border border-border rounded-lg px-4 py-3 mb-3">
-                    <code className="font-mono text-sm text-cyan flex-1 tracking-wider break-all">{generatedKey}</code>
-                    <button onClick={() => { navigator.clipboard.writeText(generatedKey); setKeyCopied(true); setTimeout(() => setKeyCopied(false), 2000); }} className="text-text-muted hover:text-cyan transition-colors shrink-0">
-                      {keyCopied ? <Check className="w-4 h-4 text-green" /> : <Copy className="w-4 h-4" />}
+                    <code className="font-mono text-sm text-cyan flex-1 tracking-wider break-all">{credentials.password}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(credentials.password); setCredCopied(true); setTimeout(() => setCredCopied(false), 2000); }}
+                      className="text-text-muted hover:text-cyan transition-colors shrink-0"
+                    >
+                      {credCopied ? <Check className="w-4 h-4 text-green" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
                   <div className="flex items-start gap-2 bg-amber/10 border border-amber/20 rounded-lg p-3 mb-6">
                     <AlertCircle className="w-4 h-4 text-amber mt-0.5 shrink-0" />
-                    <p className="text-amber text-xs">Copy this key and share with the employee. It won't be shown again.</p>
+                    <p className="text-amber text-xs">Copy these now — the password won't be shown again. The employee signs in at the main login.</p>
                   </div>
                   <NeonButton onClick={handleClosePanel} className="w-full">Done</NeonButton>
                 </div>

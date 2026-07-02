@@ -4,6 +4,7 @@ import type { ActiveLayer, FocusMode, GameEvent } from '../types'
 import type { PcSubAttackResult } from '@/store/simulationStore'
 import { ATTACK_POINTS } from '../config/attacks'
 import { useAudioStore } from './audioStore'
+import { recordObjectiveOutcome } from './analytics'
 
 function sfx(name: string) {
   useAudioStore.getState().play(name)
@@ -134,6 +135,7 @@ export const useGameStore = create<GameState & GameActions>()(
           currentPointId: nextUnresolved(resolved),
         })
         get().logEvent({ type: 'attack_completed', pointId: id, payload: { scoreDelta } })
+        recordObjectiveOutcome({ pointId: id, outcome: 'completed', scoreDelta })
         sfx('correct_sting')
         setTimeout(() => sfx('score_gain'), 800)
         useAudioStore.getState().stopAllScenarioAudio()
@@ -157,6 +159,7 @@ export const useGameStore = create<GameState & GameActions>()(
           currentPointId: nextUnresolved(resolved),
         })
         get().logEvent({ type: 'attack_failed', pointId: id, payload: { reason, attemptNumber: newCount } })
+        recordObjectiveOutcome({ pointId: id, outcome: 'failed', scoreDelta: -10, reason })
         sfx('wrong_glitch')
       },
 

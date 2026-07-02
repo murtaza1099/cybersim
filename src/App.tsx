@@ -1,9 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatePresence } from "framer-motion";
+import { useAuthStore } from "@/store/authStore";
 import LoginPage from "./pages/LoginPage";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import OrgAdminDashboard from "./pages/OrgAdminDashboard";
@@ -22,6 +23,7 @@ function AnimatedRoutes() {
       <Routes location={location} key={location.pathname}>
         {EditorApp && <Route path="/editor" element={<Suspense fallback={null}><EditorApp /></Suspense>} />}
         <Route path="/" element={<PageTransition><LoginPage /></PageTransition>} />
+        <Route path="/super-admin/login" element={<Navigate to="/super-admin" replace />} />
         <Route path="/super-admin" element={<ProtectedRoute role="super_admin"><PageTransition><SuperAdminDashboard /></PageTransition></ProtectedRoute>} />
         <Route path="/org-admin" element={<ProtectedRoute role="org_admin"><PageTransition><OrgAdminDashboard /></PageTransition></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute role="employee"><PageTransition><EmployeeDashboard /></PageTransition></ProtectedRoute>} />
@@ -34,15 +36,20 @@ function AnimatedRoutes() {
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Sonner />
-      <BrowserRouter>
-        <AnimatedRoutes />
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  useEffect(() => {
+    void useAuthStore.getState().restoreSession();
+  }, []);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Sonner />
+        <BrowserRouter>
+          <AnimatedRoutes />
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

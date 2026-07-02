@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 import { Shield, Cpu, Wifi, Lock } from 'lucide-react'
 import Level1Simulation, { type Level1ExitResult } from './App'
 import { useAuthStore } from '@/store/authStore'
@@ -87,7 +88,12 @@ export default function Level1Route() {
     if (result && result.status !== 'in-progress') {
       const completedResult = { ...result, completedAt: new Date().toISOString() }
       completeSessionLevel1(completedResult)
-      if (userId) completeEmployeeLevel1(userId, completedResult)
+      if (userId) {
+        completeEmployeeLevel1(userId, completedResult).catch((err) => {
+          console.error('Failed to save Level 1 result', err)
+          toast.error('Your Level 1 result could not be saved.')
+        })
+      }
     }
     navigate('/dashboard')
   }, [completeEmployeeLevel1, completeSessionLevel1, navigate, userId])

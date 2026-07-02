@@ -1,13 +1,13 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { supabase } from '@/lib/supabase';
 import { ATTACK_MODULES, BADGES } from '@/data/mockData';
 import type { Level1Result } from '@/store/simulationStore';
+import type { Json } from '@/lib/database.types';
 
 export interface Organization {
   id: string;
   name: string;
   createdAt: string;
-  orgKey: string;
   status: 'active' | 'suspended';
 }
 
@@ -15,7 +15,6 @@ export interface Employee {
   id: string;
   name: string;
   email: string;
-  empKey: string;
   level: number;
   orgId: string;
   moduleProgress: Record<string, number>;
@@ -29,186 +28,282 @@ export interface Employee {
   gender?: string;
 }
 
+/** Credentials returned when an employee auth account is provisioned. */
+export interface ProvisionedEmployee {
+  email: string;
+  password: string;
+}
+
 interface DataState {
   organizations: Organization[];
   employees: Employee[];
 
-  // Org actions
-  addOrganization: (name: string) => string; // returns generated key
-  updateOrgStatus: (orgId: string, status: 'active' | 'suspended') => void;
-  revokeOrgKey: (orgId: string) => string; // returns new key
+  // Reads (populate the in-memory cache from Supabase)
+  refreshOrganizations: () => Promise<void>;
+  refreshEmployees: (orgId?: string) => Promise<void>;
+  refreshEmployee: (userId: string) => Promise<void>;
+
+  // Writes
+  addOrganization: (name: string) => Promise<Organization>;
+  updateOrgStatus: (orgId: string, status: 'active' | 'suspended') => Promise<void>;
+  addEmployee: (
+    name: string,
+    email: string,
+    orgId: string,
+    jobRole?: string,
+    age?: number,
+    gender?: string,
+  ) => Promise<ProvisionedEmployee>;
+  updateEmployeeProgress: (empId: string, moduleId: string, score: number) => Promise<void>;
+  completeLevel1: (empId: string, result: Level1Result) => Promise<void>;
+
+  // Sync selectors over the cache
   getOrg: (orgId: string) => Organization | undefined;
-  getOrgByKey: (key: string) => Organization | undefined;
-
-  // Employee actions
-  addEmployee: (name: string, email: string, orgId: string, jobRole?: string, age?: number, gender?: string) => string; // returns generated key
-  getEmployeesByOrg: (orgId: string) => Employee[];
-  getEmployeeByKey: (key: string) => Employee | undefined;
   getEmployee: (empId: string) => Employee | undefined;
-  updateEmployeeProgress: (empId: string, moduleId: string, score: number) => void;
-  completeLevel1: (empId: string, result: Level1Result) => void;
-  regenerateEmployeeKey: (empId: string) => string;
-
-  // Helpers
-  isValidKey: (key: string) => boolean;
 }
 
-function generateOrgKey(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = 'ORG-';
-  for (let i = 0; i < 12; i++) result += chars[Math.floor(Math.random() * chars.length)];
-  return result;
+export interface Level1Derivation {
+  completedCount: number;
+  failedCount: number;
+  normalizedScore: number;
+  earnedBadgeIds: string[];
 }
 
-function generateEmpKey(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = 'EMP-';
-  for (let i = 0; i < 16; i++) result += chars[Math.floor(Math.random() * chars.length)];
-  return result;
+/** Pure derivation of Level 1 progress (score → %, completed count, badges). */
+export function deriveLevel1Progress(
+  result: Pick<Level1Result, 'score' | 'completedAttacks' | 'failedAttacks'>,
+): Level1Derivation {
+  const completedCount = Math.max(0, Math.min(result.completedAttacks ?? 0, ATTACK_MODULES.length));
+  const failedCount = Math.max(0, result.failedAttacks ?? 0);
+  const normalizedScore = Math.max(0, Math.min(100, Math.round((result.score / 940) * 100)));
+  const earnedBadgeIds = ATTACK_MODULES.slice(0, completedCount)
+    .map((m) => BADGES.find((b) => b.module === m.id)?.id)
+    .filter((id): id is string => Boolean(id));
+  return { completedCount, failedCount, normalizedScore, earnedBadgeIds };
 }
 
-function generateId(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+const EMPLOYEE_SELECT =
+  'id, full_name, email, org_id, job_role, age, gender, level, xp, status, last_active, ' +
+  'module_progress(module_id, score), badges_earned(badge_id), level1_results(score, details, completed_at)';
+
+function mapOrg(row: {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
+}): Organization {
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status === 'suspended' ? 'suspended' : 'active',
+    createdAt: row.created_at,
+  };
 }
 
-const emptyProgress = (): Record<string, number> =>
-  Object.fromEntries(ATTACK_MODULES.map(m => [m.id, 0]));
+type EmployeeRow = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  org_id: string | null;
+  job_role: string | null;
+  age: number | null;
+  gender: string | null;
+  level: number;
+  xp: number;
+  status: string;
+  last_active: string | null;
+  module_progress: { module_id: string; score: number }[];
+  badges_earned: { badge_id: string }[];
+  level1_results: { score: number; details: unknown; completed_at: string }[];
+};
 
-export const useDataStore = create<DataState>()(
-  persist(
-    (set, get) => ({
-      organizations: [],
-      employees: [],
+function assembleEmployee(row: EmployeeRow): Employee {
+  const moduleProgress: Record<string, number> = Object.fromEntries(
+    ATTACK_MODULES.map((m) => [m.id, 0]),
+  );
+  for (const mp of row.module_progress) moduleProgress[mp.module_id] = mp.score;
 
-      addOrganization: (name: string) => {
-        const key = generateOrgKey();
-        const org: Organization = {
-          id: generateId('org'),
-          name,
-          createdAt: new Date().toISOString(),
-          orgKey: key,
-          status: 'active',
-        };
-        set(s => ({ organizations: [...s.organizations, org] }));
-        return key;
-      },
+  const latest = [...row.level1_results].sort((a, b) =>
+    (b.completed_at ?? '').localeCompare(a.completed_at ?? ''),
+  )[0];
 
-      updateOrgStatus: (orgId, status) => {
-        set(s => ({
-          organizations: s.organizations.map(o =>
-            o.id === orgId ? { ...o, status } : o
-          ),
-        }));
-      },
+  let level1Result: Level1Result | undefined;
+  if (latest) {
+    const details = (latest.details ?? {}) as Partial<Level1Result>;
+    level1Result = {
+      score: latest.score,
+      status: details.status ?? 'completed',
+      completedAttacks: details.completedAttacks,
+      failedAttacks: details.failedAttacks,
+      pcSubAttackResults: details.pcSubAttackResults,
+      completedAt: latest.completed_at,
+    };
+  }
 
-      revokeOrgKey: (orgId) => {
-        const newKey = generateOrgKey();
-        set(s => ({
-          organizations: s.organizations.map(o =>
-            o.id === orgId ? { ...o, orgKey: newKey } : o
-          ),
-        }));
-        return newKey;
-      },
+  return {
+    id: row.id,
+    name: row.full_name || row.email || 'Employee',
+    email: row.email ?? '',
+    level: row.level,
+    orgId: row.org_id ?? '',
+    moduleProgress,
+    level1Result,
+    xp: row.xp,
+    badges: row.badges_earned.map((b) => b.badge_id),
+    lastActive: row.last_active ?? '',
+    status: row.status === 'inactive' ? 'inactive' : 'active',
+    jobRole: row.job_role ?? undefined,
+    age: row.age ?? undefined,
+    gender: row.gender ?? undefined,
+  };
+}
 
-      getOrg: (orgId) => get().organizations.find(o => o.id === orgId),
-      getOrgByKey: (key) => get().organizations.find(o => o.orgKey === key),
+async function fetchOrganizations(): Promise<Organization[]> {
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('id, name, status, created_at')
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapOrg);
+}
 
-      addEmployee: (name, email, orgId, jobRole, age, gender) => {
-        const key = generateEmpKey();
-        const emp: Employee = {
-          id: generateId('emp'),
-          name,
-          email,
-          empKey: key,
-          level: 1,
-          orgId,
-          moduleProgress: emptyProgress(),
-          xp: 0,
-          badges: [],
-          lastActive: new Date().toISOString(),
-          status: 'active',
-          jobRole,
-          age,
-          gender,
-        };
-        set(s => ({ employees: [...s.employees, emp] }));
-        return key;
-      },
+async function fetchEmployees(orgId?: string): Promise<Employee[]> {
+  let query = supabase.from('profiles').select(EMPLOYEE_SELECT).eq('role', 'employee');
+  if (orgId) query = query.eq('org_id', orgId);
+  const { data, error } = await query.order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as EmployeeRow[]).map(assembleEmployee);
+}
 
-      getEmployeesByOrg: (orgId) => get().employees.filter(e => e.orgId === orgId),
-      getEmployeeByKey: (key) => get().employees.find(e => e.empKey === key),
-      getEmployee: (empId) => get().employees.find(e => e.id === empId),
+/** Extracts the JSON error body an Edge Function returns on a non-2xx status. */
+async function edgeErrorMessage(error: { message: string; context?: unknown }): Promise<string> {
+  const ctx = error.context;
+  if (ctx instanceof Response) {
+    try {
+      const body = (await ctx.json()) as { error?: string };
+      if (body?.error) return body.error;
+    } catch {
+      /* fall through to the generic message */
+    }
+  }
+  return error.message;
+}
 
-      updateEmployeeProgress: (empId, moduleId, score) => {
-        set(s => ({
-          employees: s.employees.map(e =>
-            e.id === empId
-              ? {
-                  ...e,
-                  moduleProgress: { ...e.moduleProgress, [moduleId]: score },
-                  lastActive: new Date().toISOString(),
-                }
-              : e
-          ),
-        }));
-      },
+export const useDataStore = create<DataState>((set, get) => ({
+  organizations: [],
+  employees: [],
 
-      completeLevel1: (empId, result) => {
-        const completedCount = Math.max(0, Math.min(result.completedAttacks ?? 0, ATTACK_MODULES.length));
-        const failedCount = Math.max(0, result.failedAttacks ?? 0);
-        const normalizedScore = Math.max(0, Math.min(100, Math.round((result.score / 940) * 100)));
-        const completedAt = result.completedAt ?? new Date().toISOString();
-        const earnedBadgeIds = ATTACK_MODULES.slice(0, completedCount)
-          .map(module => BADGES.find(badge => badge.module === module.id)?.id)
-          .filter((badgeId): badgeId is string => Boolean(badgeId));
+  refreshOrganizations: async () => {
+    set({ organizations: await fetchOrganizations() });
+  },
 
-        set(s => ({
-          employees: s.employees.map(e => {
-            if (e.id !== empId) return e;
+  refreshEmployees: async (orgId) => {
+    set({ employees: await fetchEmployees(orgId) });
+  },
 
-            const previousScore = e.level1Result?.score ?? 0;
-            const moduleProgress = ATTACK_MODULES.reduce<Record<string, number>>((acc, module) => {
-              acc[module.id] = Math.max(e.moduleProgress[module.id] ?? 0, normalizedScore);
-              return acc;
-            }, { ...e.moduleProgress });
+  refreshEmployee: async (userId) => {
+    const employees = await fetchEmployees();
+    set({ employees });
+    const self = employees.find((e) => e.id === userId);
+    if (self?.orgId) {
+      const { data } = await supabase
+        .from('organizations')
+        .select('id, name, status, created_at')
+        .eq('id', self.orgId)
+        .maybeSingle();
+      if (data) set({ organizations: [mapOrg(data)] });
+    }
+  },
 
-            return {
-              ...e,
-              level: result.status === 'completed' ? Math.max(e.level, 2) : e.level,
-              moduleProgress,
-              xp: Math.max(0, e.xp - previousScore + result.score),
-              badges: Array.from(new Set([...e.badges, ...earnedBadgeIds])),
-              lastActive: completedAt,
-              level1Result: {
-                ...result,
-                completedAttacks: completedCount,
-                failedAttacks: failedCount,
-                completedAt,
-              },
-            };
-          }),
-        }));
-      },
+  addOrganization: async (name) => {
+    const { data, error } = await supabase
+      .from('organizations')
+      .insert({ name })
+      .select('id, name, status, created_at')
+      .single();
+    if (error || !data) throw new Error(error?.message ?? 'Could not create organization');
+    const org = mapOrg(data);
+    set((s) => ({ organizations: [...s.organizations, org] }));
+    return org;
+  },
 
-      regenerateEmployeeKey: (empId) => {
-        const newKey = generateEmpKey();
-        set(s => ({
-          employees: s.employees.map(e =>
-            e.id === empId ? { ...e, empKey: newKey } : e
-          ),
-        }));
-        return newKey;
-      },
+  updateOrgStatus: async (orgId, status) => {
+    const { error } = await supabase.from('organizations').update({ status }).eq('id', orgId);
+    if (error) throw new Error(error.message);
+    set((s) => ({
+      organizations: s.organizations.map((o) => (o.id === orgId ? { ...o, status } : o)),
+    }));
+  },
 
-      isValidKey: (key) => {
-        if (key === 'SA-MASTERKEY2025') return true;
-        const state = get();
-        if (state.organizations.some(o => o.orgKey === key && o.status === 'active')) return true;
-        if (state.employees.some(e => e.empKey === key && e.status === 'active')) return true;
-        return false;
-      },
-    }),
-    { name: 'cybersim_data' }
-  )
-);
+  addEmployee: async (name, email, orgId, jobRole, age, gender) => {
+    const { data, error } = await supabase.functions.invoke<ProvisionedEmployee & { id: string }>(
+      'provision-employee',
+      { body: { name, email, orgId, jobRole, age, gender } },
+    );
+    if (error) throw new Error(await edgeErrorMessage(error));
+    if (!data) throw new Error('Employee provisioning returned no data');
+    await get().refreshEmployees(orgId);
+    return { email: data.email, password: data.password };
+  },
+
+  updateEmployeeProgress: async (empId, moduleId, score) => {
+    const { error } = await supabase
+      .from('module_progress')
+      .upsert(
+        { user_id: empId, module_id: moduleId, score, completed_at: new Date().toISOString() },
+        { onConflict: 'user_id,module_id' },
+      );
+    if (error) throw new Error(error.message);
+  },
+
+  completeLevel1: async (empId, result) => {
+    const { completedCount, failedCount, normalizedScore, earnedBadgeIds } = deriveLevel1Progress(result);
+    const completedAt = result.completedAt ?? new Date().toISOString();
+
+    const { error: l1Err } = await supabase.from('level1_results').insert({
+      user_id: empId,
+      score: result.score,
+      details: {
+        status: result.status,
+        completedAttacks: completedCount,
+        failedAttacks: failedCount,
+        pcSubAttackResults: result.pcSubAttackResults ?? [],
+      } as unknown as Json,
+      completed_at: completedAt,
+    });
+    if (l1Err) throw new Error(l1Err.message);
+
+    const progressRows = ATTACK_MODULES.map((m) => ({
+      user_id: empId,
+      module_id: m.id,
+      score: normalizedScore,
+      completed_at: completedAt,
+    }));
+    const { error: mpErr } = await supabase
+      .from('module_progress')
+      .upsert(progressRows, { onConflict: 'user_id,module_id' });
+    if (mpErr) throw new Error(mpErr.message);
+
+    if (earnedBadgeIds.length > 0) {
+      const badgeRows = earnedBadgeIds.map((id) => ({ user_id: empId, badge_id: id }));
+      const { error: bErr } = await supabase
+        .from('badges_earned')
+        .upsert(badgeRows, { onConflict: 'user_id,badge_id' });
+      if (bErr) throw new Error(bErr.message);
+    }
+
+    if (result.status === 'completed') {
+      const { error: lvlErr } = await supabase
+        .from('profiles')
+        .update({ level: 2 })
+        .eq('id', empId)
+        .lt('level', 2);
+      if (lvlErr) throw new Error(lvlErr.message);
+    }
+
+    await get().refreshEmployee(empId);
+  },
+
+  getOrg: (orgId) => get().organizations.find((o) => o.id === orgId),
+  getEmployee: (empId) => get().employees.find((e) => e.id === empId),
+}));

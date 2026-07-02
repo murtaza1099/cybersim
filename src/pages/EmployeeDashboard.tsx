@@ -1,5 +1,6 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { Zap, Shield, Target, Award, Lock, ChevronRight, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { TopNav } from '@/components/layout/TopNav';
@@ -11,7 +12,7 @@ import { DashboardGlobe } from '@/components/three/DashboardGlobe';
 import { ATTACK_MODULES, BADGES } from '@/data/mockData';
 import { useSimulationStore } from '@/store/simulationStore';
 import { useAuthStore } from '@/store/authStore';
-import { useDataStore } from '@/store/dataStore';
+import { useEmployee } from '@/hooks/useOrgData';
 
 function Corners({ color = 'border-cyan/40' }: { color?: string }) {
   return <>
@@ -25,7 +26,10 @@ function Corners({ color = 'border-cyan/40' }: { color?: string }) {
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const { userId } = useAuthStore();
-  const emp = useDataStore(s => s.getEmployee(userId || ''));
+  const { employee: emp, isError } = useEmployee(userId || '');
+  useEffect(() => {
+    if (isError) toast.error('Failed to load your training data.');
+  }, [isError]);
   const modulesCleared = useSimulationStore(s => s.modulesCleared);
   const clearedCount = modulesCleared.length;
   const moduleProgress = emp?.moduleProgress || {};

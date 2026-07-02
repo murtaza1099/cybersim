@@ -1,16 +1,28 @@
+import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { ATTACK_MODULES } from '@/data/mockData';
+import { useAnalyticsStore } from '@/store/analyticsStore';
+import { ATTACK_POINTS } from '@/pages/Level1/config/attacks';
 
-const COLORS = ['#00E5FF', '#00FF87', '#FFB800', '#FF2D6B', '#9D4EDD', '#00E5FF80', '#00FF8780'];
-
-const data = ATTACK_MODULES.map((m, i) => ({
-  name: m.name,
-  value: Math.floor(Math.random() * 40 + 10),
-  color: COLORS[i],
-}));
+const COLORS = ['#00E5FF', '#00FF87', '#FFB800', '#FF2D6B', '#9D4EDD', '#00E5FF80'];
 
 export function ModuleDonutChart() {
+  const moduleDistribution = useAnalyticsStore((s) => s.moduleDistribution);
+
+  const data = useMemo(
+    () =>
+      ATTACK_POINTS.map((p, i) => ({
+        name: p.label,
+        value: moduleDistribution[String(p.id)] ?? 0,
+        color: COLORS[i % COLORS.length],
+      })).filter((d) => d.value > 0),
+    [moduleDistribution],
+  );
+
   const total = data.reduce((s, d) => s + d.value, 0);
+
+  if (total === 0) {
+    return <div className="h-[280px] flex items-center justify-center text-text-muted text-sm">No completed objectives yet</div>;
+  }
 
   return (
     <div className="relative">

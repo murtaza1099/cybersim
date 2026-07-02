@@ -1,5 +1,26 @@
 # CyberSim Hub
 
+## Deployment (Vercel)
+
+This is a Vite + React SPA using client-side routing (`BrowserRouter`). `vercel.json`
+sets the build command (`vite build`), output directory (`dist`), and a catch-all
+rewrite to `/index.html` so deep links / refreshes on routes like `/super-admin`,
+`/dashboard`, and `/org-admin` don't 404.
+
+### Required Environment Variables
+
+Set these in the Vercel project settings (**Production** and **Preview** environments)
+— see `.env.example` for local development:
+
+| Variable | Description |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Supabase project URL (Project Settings → API). |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon/publishable key. Safe to ship to the frontend — Row-Level Security protects the data. |
+
+Do **not** add the Supabase service-role key to Vercel's frontend environment
+variables (or any `VITE_`-prefixed variable). It belongs only in Edge Functions /
+server-side code, never in client-shipped bundles.
+
 ## Level 1 Timed Simulation
 
 Level 1 now runs as a timed, data-driven simulation with decoys and real attacks.

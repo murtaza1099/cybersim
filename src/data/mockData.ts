@@ -1,11 +1,3 @@
-// Master key — the only hardcoded credential
-export const MASTER_SA_KEY = 'SA-MASTERKEY2025';
-
-// Log SA Master Key to console once at startup for developer access
-if (typeof window !== 'undefined') {
-  console.info('SA Master Key:', MASTER_SA_KEY);
-}
-
 export const ATTACK_MODULES = [
   { id: 'phishing', name: 'Phishing Email', icon: '📧', color: 'cyan' },
   { id: 'vishing', name: 'Vishing Call', icon: '📞', color: 'green' },

@@ -277,9 +277,13 @@ function BuzzingProp({ object, position, rotation, scale, buzzing }: {
     })
     buzzStartedAt.current = buzz.startedAtSeconds
 
-    if (buzz.active) {
+    if (buzz.amplitude > 0) {
       const t = clock.elapsedTime
-      g.position.set(position[0] + Math.sin(t * 55) * 0.006, position[1], position[2] + Math.cos(t * 48) * 0.006)
+      g.position.set(
+        position[0] + Math.sin(t * 55) * 0.006 * buzz.amplitude,
+        position[1],
+        position[2] + Math.cos(t * 48) * 0.006 * buzz.amplitude,
+      )
     } else {
       g.position.set(position[0], position[1], position[2])
     }

@@ -1,46 +1,35 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { BADGES } from '@/data/mockData';
-import { useDataStore } from './dataStore';
+import { deriveLevel1Progress } from './dataStore';
 import { useSimulationStore } from './simulationStore';
 
-describe('Level 1 progress integration', () => {
+describe('deriveLevel1Progress (pure)', () => {
+  it('normalises the score, clamps counts, and derives badges', () => {
+    const d = deriveLevel1Progress({ score: 760, completedAttacks: 6, failedAttacks: 2 });
+    expect(d.completedCount).toBe(6);
+    expect(d.failedCount).toBe(2);
+    // 760 / 940 ≈ 81%
+    expect(d.normalizedScore).toBe(81);
+    expect(d.earnedBadgeIds).toHaveLength(6);
+    expect(d.earnedBadgeIds.every((id) => BADGES.some((b) => b.id === id))).toBe(true);
+  });
+
+  it('clamps completed attacks to the number of modules and floors negatives', () => {
+    const d = deriveLevel1Progress({ score: -50, completedAttacks: 99, failedAttacks: -3 });
+    expect(d.completedCount).toBe(7);
+    expect(d.failedCount).toBe(0);
+    expect(d.normalizedScore).toBe(0);
+    expect(d.earnedBadgeIds).toHaveLength(7);
+  });
+});
+
+describe('Level 1 session summary', () => {
   beforeEach(() => {
-    useDataStore.setState({
-      organizations: [],
-      employees: [],
-    });
     useSimulationStore.setState({
       currentLevel: 1,
       modulesCleared: [],
       xp: 0,
     });
-  });
-
-  it('stores completed Level 1 results on the employee record', () => {
-    const orgKey = useDataStore.getState().addOrganization('Acme');
-    const org = useDataStore.getState().getOrgByKey(orgKey);
-    const empKey = useDataStore.getState().addEmployee('Dana', 'dana@example.com', org!.id);
-    const emp = useDataStore.getState().getEmployeeByKey(empKey)!;
-
-    useDataStore.getState().completeLevel1(emp.id, {
-      score: 760,
-      status: 'completed',
-      completedAttacks: 6,
-      failedAttacks: 2,
-    });
-
-    const updated = useDataStore.getState().getEmployee(emp.id)!;
-    expect(updated.level1Result).toMatchObject({
-      score: 760,
-      status: 'completed',
-      completedAttacks: 6,
-      failedAttacks: 2,
-    });
-    expect(updated.level1Result?.completedAt).toEqual(expect.any(String));
-    expect(updated.xp).toBe(760);
-    expect(updated.moduleProgress.phishing).toBeGreaterThan(0);
-    expect(updated.badges).toHaveLength(6);
-    expect(updated.badges.every((badge) => BADGES.some((b) => b.id === badge))).toBe(true);
   });
 
   it('updates the session-level simulation summary without duplicating modules', () => {
