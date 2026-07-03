@@ -1,1 +1,2 @@
-public/*.glb filter=lfs diff=lfs merge=lfs -text
+# Git LFS removed for public/*.glb — 3D models are committed as real binaries
+# so static hosts (Vercel) serve the actual files, not LFS pointers.

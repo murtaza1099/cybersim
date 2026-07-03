@@ -27,9 +27,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Large binary files (3D models, etc.)
-*.glb
-*.gltf
+# 3D source formats (not served) — keep out of git. The runtime .glb/.gltf in
+# public/ ARE committed so the deployed app can load them.
 *.fbx
 *.blend
 *.usdz
@@ -37,4 +36,3 @@ dist-ssr
 *.mtl
 *.3ds
 *.max
-public/studio_office_interior.glb
