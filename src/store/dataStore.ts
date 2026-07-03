@@ -2,13 +2,18 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { ATTACK_MODULES, BADGES } from '@/data/mockData';
 import type { Level1Result } from '@/store/simulationStore';
-import type { Json } from '@/lib/database.types';
+import type { Json, Database } from '@/lib/database.types';
+
+type OrganizationRow = Database['public']['Tables']['organizations']['Row'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
 export interface Organization {
   id: string;
   name: string;
   createdAt: string;
   status: 'active' | 'suspended';
+  /** Short human login key (e.g. "ORG-1A2B3C4D"). */
+  orgKey: string;
 }
 
 export interface Employee {
@@ -26,12 +31,28 @@ export interface Employee {
   jobRole?: string;
   age?: number;
   gender?: string;
+  /** Employee login key (e.g. "EMP-1A2B3C4D"); null for legacy rows. */
+  accessKey: string | null;
 }
 
-/** Credentials returned when an employee auth account is provisioned. */
-export interface ProvisionedEmployee {
+/** Employee + login key returned by the create-employee Edge Function. */
+export interface CreatedEmployee {
+  id: string;
+  name: string;
   email: string;
-  password: string;
+  empKey: string;
+}
+
+/** Shape returned by the create-org Edge Function. */
+interface CreateOrgResponse {
+  org: OrganizationRow;
+  orgKey: string;
+}
+
+/** Shape returned by the create-employee Edge Function. */
+interface CreateEmployeeResponse {
+  employee: ProfileRow;
+  empKey: string;
 }
 
 interface DataState {
@@ -53,7 +74,7 @@ interface DataState {
     jobRole?: string,
     age?: number,
     gender?: string,
-  ) => Promise<ProvisionedEmployee>;
+  ) => Promise<CreatedEmployee>;
   updateEmployeeProgress: (empId: string, moduleId: string, score: number) => Promise<void>;
   completeLevel1: (empId: string, result: Level1Result) => Promise<void>;
 
@@ -82,8 +103,10 @@ export function deriveLevel1Progress(
   return { completedCount, failedCount, normalizedScore, earnedBadgeIds };
 }
 
+const ORG_SELECT = 'id, name, status, created_at, org_key';
+
 const EMPLOYEE_SELECT =
-  'id, full_name, email, org_id, job_role, age, gender, level, xp, status, last_active, ' +
+  'id, full_name, email, org_id, job_role, age, gender, level, xp, status, last_active, access_key, ' +
   'module_progress(module_id, score), badges_earned(badge_id), level1_results(score, details, completed_at)';
 
 function mapOrg(row: {
@@ -91,12 +114,14 @@ function mapOrg(row: {
   name: string;
   status: string;
   created_at: string;
+  org_key: string;
 }): Organization {
   return {
     id: row.id,
     name: row.name,
     status: row.status === 'suspended' ? 'suspended' : 'active',
     createdAt: row.created_at,
+    orgKey: row.org_key,
   };
 }
 
@@ -112,6 +137,7 @@ type EmployeeRow = {
   xp: number;
   status: string;
   last_active: string | null;
+  access_key: string | null;
   module_progress: { module_id: string; score: number }[];
   badges_earned: { badge_id: string }[];
   level1_results: { score: number; details: unknown; completed_at: string }[];
@@ -155,13 +181,14 @@ function assembleEmployee(row: EmployeeRow): Employee {
     jobRole: row.job_role ?? undefined,
     age: row.age ?? undefined,
     gender: row.gender ?? undefined,
+    accessKey: row.access_key,
   };
 }
 
 async function fetchOrganizations(): Promise<Organization[]> {
   const { data, error } = await supabase
     .from('organizations')
-    .select('id, name, status, created_at')
+    .select(ORG_SELECT)
     .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapOrg);
@@ -208,7 +235,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     if (self?.orgId) {
       const { data } = await supabase
         .from('organizations')
-        .select('id, name, status, created_at')
+        .select(ORG_SELECT)
         .eq('id', self.orgId)
         .maybeSingle();
       if (data) set({ organizations: [mapOrg(data)] });
@@ -216,13 +243,14 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   addOrganization: async (name) => {
-    const { data, error } = await supabase
-      .from('organizations')
-      .insert({ name })
-      .select('id, name, status, created_at')
-      .single();
-    if (error || !data) throw new Error(error?.message ?? 'Could not create organization');
-    const org = mapOrg(data);
+    // The create-org Edge Function (super_admin only) creates the org, mints a
+    // unique ORG- key, and provisions the org_admin auth user.
+    const { data, error } = await supabase.functions.invoke<CreateOrgResponse>('create-org', {
+      body: { name },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error));
+    if (!data?.org) throw new Error('Organization creation returned no data');
+    const org = mapOrg(data.org);
     set((s) => ({ organizations: [...s.organizations, org] }));
     return org;
   },
@@ -236,14 +264,28 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   addEmployee: async (name, email, orgId, jobRole, age, gender) => {
-    const { data, error } = await supabase.functions.invoke<ProvisionedEmployee & { id: string }>(
-      'provision-employee',
-      { body: { name, email, orgId, jobRole, age, gender } },
-    );
+    // The create-employee Edge Function (org_admin only) creates the employee
+    // auth user in the caller's org and assigns a unique EMP- access key. The
+    // caller's org is derived from their JWT server-side; orgId here is only
+    // used to refresh the correct slice of the local cache.
+    const { data, error } = await supabase.functions.invoke<CreateEmployeeResponse>('create-employee', {
+      body: {
+        full_name: name,
+        email: email || undefined,
+        job_role: jobRole,
+        age,
+        gender,
+      },
+    });
     if (error) throw new Error(await edgeErrorMessage(error));
-    if (!data) throw new Error('Employee provisioning returned no data');
+    if (!data?.employee || !data?.empKey) throw new Error('Employee creation returned no data');
     await get().refreshEmployees(orgId);
-    return { email: data.email, password: data.password };
+    return {
+      id: data.employee.id,
+      name: data.employee.full_name || name,
+      email: data.employee.email ?? (email || ''),
+      empKey: data.empKey,
+    };
   },
 
   updateEmployeeProgress: async (empId, moduleId, score) => {

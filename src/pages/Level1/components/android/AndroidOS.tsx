@@ -56,6 +56,10 @@ function Screen() {
   const { history, dispatch } = useAndroidCtx()
   const screen = currentScreen(history)
   const [isExiting, setIsExiting] = useState(false)
+  // Notification badge on the app the current objective needs (e.g. Messages for
+  // the SMS-phishing point) so the user knows what to open. Clears with the scene.
+  const activePoint = useGameStore(s => s.activePoint)
+  const objectiveApp = ATTACK_POINTS.find(a => a.id === activePoint && a.triggerOS === 'android')?.appToOpen ?? null
 
   const slideStyle = (show: boolean): React.CSSProperties => ({
     position: 'absolute', inset: 0,
@@ -81,16 +85,20 @@ function Screen() {
         backgroundImage: ['radial-gradient(#0d1929, #04060f)', 'repeating-linear-gradient(transparent, transparent 2px, rgba(0,255,240,0.015) 2px, rgba(0,255,240,0.015) 4px)'].join(','),
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, padding: '24px 16px' }}>
-          {ICONS.map(ic => (
-            <div key={ic.name}
-                 onDoubleClick={() => dispatch({ type: 'OPEN', screen: ic.name })}
-                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid #1a1f2a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
-                {ic.glyph}
+          {ICONS.map(ic => {
+            const notify = ic.name === objectiveApp
+            return (
+              <div key={ic.name}
+                   onDoubleClick={() => dispatch({ type: 'OPEN', screen: ic.name })}
+                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ position: 'relative', width: 48, height: 48, borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid #1a1f2a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, boxShadow: notify ? '0 0 0 2px rgba(255,51,85,0.55)' : undefined }}>
+                  {ic.glyph}
+                  {notify && <div style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#ff3355', color: '#fff', border: '2px solid #06080f', fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>1</div>}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, color: '#9ca3af' }}>{ic.label}</div>
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, color: '#9ca3af' }}>{ic.label}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

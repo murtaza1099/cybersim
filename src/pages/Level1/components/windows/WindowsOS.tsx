@@ -235,6 +235,13 @@ function Desktop({ isPcSession }: { isPcSession: boolean }) {
   const macroVisible = isPcSession && fired.macro_doc
   const browserPulse = isPcSession && fired.browser_nudge && (attacks.clickfix?.status ?? 'pending') === 'pending'
 
+  // Unread-email badge for the Workstation objective: Outlook holds the two email
+  // attacks (phishing + CEO fraud). The badge counts those still unhandled and
+  // clears once both are resolved, so the user knows to open Outlook.
+  const outlookUnread = isPcSession
+    ? (['email_phish', 'ceo_fraud'] as const).filter(id => (attacks[id]?.status ?? 'pending') === 'pending').length
+    : 0
+
   const icons: DesktopIcon[] = macroVisible
     ? [...BASE_ICONS, { key: 'excel', label: 'Portfolio.pdf .exe', app: 'fileExplorer', Icon: IconExcel, col: 1 }]
     : BASE_ICONS
@@ -244,12 +251,15 @@ function Desktop({ isPcSession }: { isPcSession: boolean }) {
   const renderIcon = (ic: DesktopIcon) => {
     const isOpen = ic.app ? openApps.some(a => a.appName === ic.app) : false
     const isExcel = ic.key === 'excel'
-    const showPulse = ic.key === 'browser' && browserPulse
+    const browserNudge = ic.key === 'browser' && browserPulse
+    const unread = ic.key === 'outlook' ? outlookUnread : 0
+    const showPulse = browserNudge || unread > 0
     return (
       <div key={ic.key} className={`win-icon-wrap${isExcel ? ' win-icon-appear' : ''}`} onClick={() => ic.app && dispatch({ type: 'OPEN_APP', appName: ic.app })} style={{ cursor: ic.app ? 'pointer' : 'default' }}>
         <div className="win-icon-area" style={showPulse ? { animation: 'winPulseDot 1.4s ease-in-out infinite' } : undefined}><ic.Icon /></div>
         <span className="win-icon-label">{ic.label}</span>
-        {showPulse && <div style={{ position: 'absolute', top: 4, right: 16, width: 9, height: 9, borderRadius: '50%', background: colors.amber, border: '1.5px solid #0d1829' }} />}
+        {browserNudge && <div style={{ position: 'absolute', top: 4, right: 16, width: 9, height: 9, borderRadius: '50%', background: colors.amber, border: '1.5px solid #0d1829' }} />}
+        {unread > 0 && <div style={{ position: 'absolute', top: 2, right: 6, minWidth: 15, height: 15, padding: '0 4px', borderRadius: 8, background: colors.red, color: '#fff', border: '1.5px solid #0d1829', fontFamily: fonts.mono, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{unread}</div>}
         {isExcel && newBadge && <div style={{ position: 'absolute', top: 2, right: 8, padding: '1px 5px', borderRadius: 3, background: colors.green, color: '#04240f', fontFamily: fonts.mono, fontSize: 8, fontWeight: 700 }}>NEW</div>}
         {isOpen && <div style={{ width: 4, height: 4, borderRadius: '50%', background: colors.cyan, marginTop: -2 }} />}
       </div>

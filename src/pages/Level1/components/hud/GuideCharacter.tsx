@@ -73,6 +73,26 @@ export default function GuideCharacter({ introComplete }: Props) {
     return () => clearTimeout(t)
   }, [currentPointId, speak])
 
+  // Next-objective cue — once an objective is resolved and the player is back in
+  // the free scene, the SubtitleBar names the NEXT hotspot to open by its letter
+  // (A, B, C… — same mapping as the 3D markers) and location. The starting
+  // objective on load is skipped; this fires right after the Workstation, etc.
+  const announcedFor = useRef<number | null>(null)
+  useEffect(() => {
+    if (!introComplete || allComplete) return
+    if (activeLayer !== 'scene') return
+    const idx = ATTACK_POINTS.findIndex(a => a.id === currentPointId)
+    if (idx < 0) return
+    if (announcedFor.current === null) { announcedFor.current = currentPointId; return }
+    if (announcedFor.current === currentPointId) return
+    announcedFor.current = currentPointId
+    const letter = String.fromCharCode(65 + idx)
+    useGameStore.getState().setSubtitle(
+      `NEXT ► Open hotspot ${letter} — ${ATTACK_POINTS[idx].displayName}`,
+      4200,
+    )
+  }, [introComplete, activeLayer, currentPointId, allComplete])
+
   // correct — a point was just completed
   const prevCompleted = useRef(completedPoints.length)
   useEffect(() => {

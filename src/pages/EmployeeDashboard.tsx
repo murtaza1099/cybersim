@@ -10,7 +10,6 @@ import { StatCard } from '@/components/ui/StatCard';
 import { ThreatRadarChart } from '@/components/charts/ThreatRadarChart';
 import { DashboardGlobe } from '@/components/three/DashboardGlobe';
 import { ATTACK_MODULES, BADGES } from '@/data/mockData';
-import { useSimulationStore } from '@/store/simulationStore';
 import { useAuthStore } from '@/store/authStore';
 import { useEmployee } from '@/hooks/useOrgData';
 
@@ -30,11 +29,14 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     if (isError) toast.error('Failed to load your training data.');
   }, [isError]);
-  const modulesCleared = useSimulationStore(s => s.modulesCleared);
-  const clearedCount = modulesCleared.length;
   const moduleProgress = emp?.moduleProgress || {};
   const xp = emp?.xp || 0;
   const badges = emp?.badges || [];
+  // "Cleared" is derived from the logged-in employee's REAL module_progress:
+  // a module counts only if its score > 0. A first-time employee has none,
+  // so XP / badges / cleared all read 0 — no placeholder numbers.
+  const clearedModuleIds = ATTACK_MODULES.filter(m => (moduleProgress[m.id] || 0) > 0).map(m => m.id);
+  const clearedCount = clearedModuleIds.length;
   const avgScore = (() => {
     const scores = Object.values(moduleProgress).filter((v): v is number => typeof v === 'number' && v > 0);
     return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
@@ -99,7 +101,7 @@ export default function EmployeeDashboard() {
               <span className="font-display text-[9px] tracking-[0.2em] text-text-muted block mb-3">ACTIVE THREAT VECTORS</span>
               <div className="space-y-1.5">
                 {ATTACK_MODULES.map(m => {
-                  const cleared = modulesCleared.includes(m.id);
+                  const cleared = clearedModuleIds.includes(m.id);
                   return (
                     <div key={m.id} className={`flex items-center gap-2.5 py-1 px-2 rounded transition-colors ${cleared ? 'opacity-50' : 'bg-elevated/40'}`}>
                       <span className={`text-base ${!cleared ? 'animate-pulse' : ''}`}>{m.icon}</span>

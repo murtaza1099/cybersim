@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { LayoutDashboard, Building2, BarChart3, Download, Users, AlertTriangle, CheckCircle, X, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
-import { useDataStore } from '@/store/dataStore';
+import { useDataStore, type Organization } from '@/store/dataStore';
 import { useOrganizations, useEmployees } from '@/hooks/useOrgData';
 import { useLiveAnalytics } from '@/hooks/useLiveAnalytics';
 import { DashboardSidebar } from '@/components/layout/Sidebar';
@@ -12,6 +12,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { NeonButton } from '@/components/ui/NeonButton';
+import { KeyReveal } from '@/components/ui/KeyReveal';
 import { CompletionBarChart } from '@/components/charts/CompletionBarChart';
 import { ModuleDonutChart } from '@/components/charts/ModuleDonutChart';
 import { LiveActivityPanel } from '@/components/analytics/LiveActivityPanel';
@@ -181,7 +182,7 @@ function OrgTable() {
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-elevated">
-            {['#', 'Organization', 'Created', 'Users', 'Status', 'Actions'].map(h => (
+            {['#', 'Organization', 'Created', 'Users', 'Access Key', 'Status', 'Actions'].map(h => (
               <th key={h} className="text-left p-3 text-text-muted font-display text-[10px] tracking-wider">{h}</th>
             ))}
           </tr>
@@ -195,6 +196,7 @@ function OrgTable() {
                 <td className="p-3 text-text-primary font-medium">{org.name}</td>
                 <td className="p-3 text-text-secondary text-xs">{formatDate(org.createdAt)}</td>
                 <td className="p-3 text-text-primary">{empCount}</td>
+                <td className="p-3"><KeyReveal value={org.orgKey} /></td>
                 <td className="p-3"><StatusBadge status={org.status} /></td>
                 <td className="p-3">
                   <button
@@ -217,15 +219,16 @@ function OrgsTab() {
   const [showModal, setShowModal] = useState(false);
   const [orgName, setOrgName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [createdOrg, setCreatedOrg] = useState<Organization | null>(null);
   const addOrganization = useDataStore(s => s.addOrganization);
 
   const handleCreate = async () => {
-    if (!orgName.trim()) return;
+    if (!orgName.trim() || creating) return;
     setCreating(true);
     try {
       const org = await addOrganization(orgName.trim());
       toast.success(`Organization “${org.name}” created`);
-      handleClose();
+      setCreatedOrg(org);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not create organization');
     } finally {
@@ -236,6 +239,7 @@ function OrgsTab() {
   const handleClose = () => {
     setShowModal(false);
     setOrgName('');
+    setCreatedOrg(null);
   };
 
   return (
@@ -268,22 +272,44 @@ function OrgsTab() {
                 <button onClick={handleClose} className="absolute top-4 right-4 text-text-muted hover:text-text-primary transition-colors">
                   <X className="w-5 h-5" />
                 </button>
-                <h2 className="font-display font-bold text-xl text-text-primary mb-1">Create Organization</h2>
-                <p className="text-text-secondary text-sm mb-6">Add a new organization to the platform</p>
 
-                <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">ORGANIZATION NAME</label>
-                <input
-                  type="text"
-                  value={orgName}
-                  onChange={e => setOrgName(e.target.value)}
-                  placeholder="Enter organization name"
-                  className="w-full bg-elevated border border-border rounded-lg px-4 py-3 font-body text-sm text-text-primary placeholder:text-text-muted/40 outline-none focus:border-cyan focus:shadow-[0_0_20px_rgba(0,229,255,0.15)] transition-all mb-6"
-                  autoFocus
-                  onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                />
-                <NeonButton onClick={handleCreate} className="w-full" disabled={!orgName.trim()} loading={creating}>
-                  Create Organization
-                </NeonButton>
+                {!createdOrg ? (
+                  <>
+                    <h2 className="font-display font-bold text-xl text-text-primary mb-1">Create Organization</h2>
+                    <p className="text-text-secondary text-sm mb-6">Add a new organization to the platform</p>
+
+                    <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">ORGANIZATION NAME</label>
+                    <input
+                      type="text"
+                      value={orgName}
+                      onChange={e => setOrgName(e.target.value)}
+                      placeholder="Enter organization name"
+                      className="w-full bg-elevated border border-border rounded-lg px-4 py-3 font-body text-sm text-text-primary placeholder:text-text-muted/40 outline-none focus:border-cyan focus:shadow-[0_0_20px_rgba(0,229,255,0.15)] transition-all mb-6"
+                      autoFocus
+                      onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                    />
+                    <NeonButton onClick={handleCreate} className="w-full" disabled={!orgName.trim()} loading={creating}>
+                      Create Organization
+                    </NeonButton>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-1">
+                      <CheckCircle className="w-5 h-5 text-green shrink-0" />
+                      <h2 className="font-display font-bold text-xl text-text-primary">Organization Created</h2>
+                    </div>
+                    <p className="text-text-secondary text-sm mb-6">
+                      <span className="text-text-primary font-semibold">{createdOrg.name}</span> is ready. Share this
+                      access key with its administrator to sign in at the main login.
+                    </p>
+
+                    <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">ORG ACCESS KEY</label>
+                    <div className="mb-6">
+                      <KeyReveal value={createdOrg.orgKey} className="w-full justify-between" />
+                    </div>
+                    <NeonButton onClick={handleClose} className="w-full">Done</NeonButton>
+                  </>
+                )}
               </GlassCard>
             </motion.div>
           </motion.div>

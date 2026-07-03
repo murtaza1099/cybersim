@@ -38,6 +38,12 @@ interface GameState {
   subtitleText: string | null
   lockedToastVisible: boolean
   pcSubAttackResults: PcSubAttackResult[]
+  /** Auth user id that owns this persisted save. A different user on the same
+   *  browser resets on first Level 1 entry so they never inherit a prior play. */
+  ownerUserId: string | null
+  /** Objective point ids whose prop has already buzzed this play. Lives in the
+   *  store (not a component ref) so it survives prop remounts; NOT persisted. */
+  buzzedPointIds: number[]
 }
 
 interface GameActions {
@@ -53,6 +59,10 @@ interface GameActions {
   setSubtitle: (text: string, durationMs: number) => void
   setPcSubAttackResults: (results: PcSubAttackResult[]) => void
   reconcileObjective: () => void
+  /** Reset the save iff a different user owns it (owner-aware, login-independent). */
+  ensureOwner: (userId: string | null) => void
+  /** Latch an objective's prop as buzzed for this play (idempotent). */
+  markBuzzed: (id: number) => void
   logEvent: (partial: Omit<GameEvent, 'id' | 'ts'>) => void
   resetGame: () => void
 }
@@ -73,6 +83,8 @@ export const useGameStore = create<GameState & GameActions>()(
       subtitleText: null,
       lockedToastVisible: false,
       pcSubAttackResults: [],
+      ownerUserId: null,
+      buzzedPointIds: [],
 
       startPoint(id) {
         const { currentPointId, completedPoints, failedPoints } = get()
@@ -203,6 +215,20 @@ export const useGameStore = create<GameState & GameActions>()(
         }
       },
 
+      ensureOwner(userId) {
+        if (!userId) return
+        if (get().ownerUserId === userId) return
+        // Different (or first-time) user on this browser — never inherit the
+        // previous player's save. Clean start, then claim ownership.
+        get().resetGame()
+        set({ ownerUserId: userId })
+      },
+
+      markBuzzed(id) {
+        if (get().buzzedPointIds.includes(id)) return
+        set((s) => ({ buzzedPointIds: [...s.buzzedPointIds, id] }))
+      },
+
       logEvent(partial) {
         const event: GameEvent = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -230,6 +256,9 @@ export const useGameStore = create<GameState & GameActions>()(
           subtitleText: null,
           lockedToastVisible: false,
           pcSubAttackResults: [],
+          // Re-arm one buzz per objective for a genuinely new play. ownerUserId is
+          // intentionally left intact (it's ownership, not per-play progress).
+          buzzedPointIds: [],
         })
       },
     }),
@@ -243,6 +272,7 @@ export const useGameStore = create<GameState & GameActions>()(
         attempts: s.attempts,
         eventLog: s.eventLog.slice(-50),
         pcSubAttackResults: s.pcSubAttackResults,
+        ownerUserId: s.ownerUserId,
       }),
     }
   )

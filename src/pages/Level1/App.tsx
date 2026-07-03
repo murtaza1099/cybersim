@@ -31,7 +31,7 @@ import ScenarioContextCard       from './components/game/ScenarioContextCard'
 import CenteredOverlay           from './components/ui/CenteredOverlay'
 import SceneLoader               from './components/ui/SceneLoader'
 import IntroSequence             from './components/IntroSequence'
-import { nextBuzzState }         from './utils/buzzLimiter'
+import { buzzAmplitude }         from './utils/buzzLimiter'
 
 export type Level1ExitResult = {
   score: number
@@ -256,33 +256,44 @@ function AudioReactor() {
   return null
 }
 
-// ─── A prop that buzzes in place while its attack is the pending objective ────
-function BuzzingProp({ object, position, rotation, scale, buzzing }: {
+// ─── A prop that buzzes in place ONCE for its objective ───────────────────────
+// Plays exactly one 3s pulse the first time its objective becomes active in the
+// free scene, then never again for the whole play. The "already buzzed" latch
+// lives in gameStore keyed by point id (buzzedPointIds), NOT a component ref, so
+// it survives this prop unmounting/remounting when a Windows/Android OS overlay
+// opens and closes — that remount was the source of the second vibration.
+function BuzzingProp({ object, position, rotation, scale, pointId, active }: {
   object: THREE.Object3D
   position: number[]
   rotation: number[]
   scale: number | number[]
-  buzzing: boolean
+  pointId: number
+  active: boolean
 }) {
   const ref = useRef<THREE.Group>(null)
   const buzzStartedAt = useRef<number | null>(null)
   useFrame(({ clock }) => {
     const g = ref.current
     if (!g) return
+    const t = clock.elapsedTime
 
-    const buzz = nextBuzzState({
-      buzzing,
-      clockElapsedSeconds: clock.elapsedTime,
-      startedAtSeconds: buzzStartedAt.current,
-    })
-    buzzStartedAt.current = buzz.startedAtSeconds
+    // Arm exactly one pulse per objective for the whole play. Guard on the shared
+    // latch: if this objective already buzzed (even before a remount), never arm.
+    if (active && buzzStartedAt.current === null && !useGameStore.getState().buzzedPointIds.includes(pointId)) {
+      useGameStore.getState().markBuzzed(pointId)
+      buzzStartedAt.current = t
+    }
 
-    if (buzz.amplitude > 0) {
-      const t = clock.elapsedTime
+    // Drive the pinned 3s envelope to completion, independent of focusMode.
+    const amplitude = buzzStartedAt.current === null
+      ? 0
+      : buzzAmplitude(t - buzzStartedAt.current)
+
+    if (amplitude > 0) {
       g.position.set(
-        position[0] + Math.sin(t * 55) * 0.006 * buzz.amplitude,
+        position[0] + Math.sin(t * 55) * 0.006 * amplitude,
         position[1],
-        position[2] + Math.cos(t * 48) * 0.006 * buzz.amplitude,
+        position[2] + Math.cos(t * 48) * 0.006 * amplitude,
       )
     } else {
       g.position.set(position[0], position[1], position[2])
@@ -341,8 +352,8 @@ function OfficeScene({ onReady, sweepComplete }: { onReady: () => void; sweepCom
   return (
     <>
       <primitive object={roomScene} />
-      <BuzzingProp object={phoneScene} position={P.phone.position}     rotation={P.phone.rotation}     scale={P.phone.scale}     buzzing={currentPointId === 4 && focusMode === 'free'} />
-      <BuzzingProp object={telScene}   position={P.telephone.position} rotation={P.telephone.rotation} scale={P.telephone.scale} buzzing={currentPointId === 5 && focusMode === 'free'} />
+      <BuzzingProp object={phoneScene} pointId={4} position={P.phone.position}     rotation={P.phone.rotation}     scale={P.phone.scale}     active={currentPointId === 4 && focusMode === 'free'} />
+      <BuzzingProp object={telScene}   pointId={5} position={P.telephone.position} rotation={P.telephone.rotation} scale={P.telephone.scale} active={currentPointId === 5 && focusMode === 'free'} />
       <primitive object={usbScene}    position={P.usb.position}        rotation={P.usb.rotation}        scale={P.usb.scale} />
       <primitive object={wbScene}     position={P.whiteboard.position} rotation={P.whiteboard.rotation} scale={P.whiteboard.scale} />
       <primitive object={boxScene}    position={P.box.position}        rotation={P.box.rotation}        scale={P.box.scale} />
@@ -352,7 +363,7 @@ function OfficeScene({ onReady, sweepComplete }: { onReady: () => void; sweepCom
         if (index >= revealedCount) return null
         const pos = ANCHORS[a.anchorKey as AnchorKey]
         if (!pos) { console.error(`Missing anchor: ${a.anchorKey}`); return null }
-        return <AnnotationPoint key={a.id} id={a.id} displayNumber={index + 1} position={pos} />
+        return <AnnotationPoint key={a.id} id={a.id} displayLabel={String.fromCharCode(65 + index)} position={pos} />
       })}
     </>
   )

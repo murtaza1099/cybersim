@@ -119,16 +119,14 @@ const MAILS: Mail[] = [
 ]
 
 export default function OutlookApp() {
-  const fired           = usePcStore(s => s.fired)
-  const firedAt         = usePcStore(s => s.firedAt)
   const recordInspection = usePcStore(s => s.recordInspection)
   const resolveAttack   = usePcStore(s => s.resolveAttack)
   const reportLegit     = usePcStore(s => s.reportLegit)
 
-  // Emails appear only once their notification fires, ordered by arrival (newest last).
+  // Seeded inbox: every message (phish, manager, ceo, digest/newsletter,
+  // helpdesk/it_policy) is present the moment Outlook opens — nothing waits on a
+  // timeline trigger, so the inbox is never empty or half-loaded.
   const visible = MAILS
-    .filter(m => m.firedKey && fired[m.firedKey])
-    .sort((a, b) => (firedAt[a.firedKey ?? ''] ?? 0) - (firedAt[b.firedKey ?? ''] ?? 0))
   const [selected, setSelected] = useState<string>('phish')
   const [expanded, setExpanded] = useState(false)
   const [hoverLink, setHoverLink] = useState(false)

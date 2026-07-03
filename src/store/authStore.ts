@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { StoreApi } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
+import { useGameStore } from '@/pages/Level1/stores/gameStore';
+import { useSimulationStore } from '@/store/simulationStore';
 
 type Role = Database['public']['Enums']['user_role'];
 
@@ -20,6 +22,14 @@ export interface LoginResult {
   redirectPath?: string;
 }
 
+/** Shape returned by the public `key-login` Edge Function. */
+interface KeyLoginResponse {
+  email: string;
+  token: string;
+  token_hash?: string;
+  type: string;
+}
+
 interface AuthState {
   role: Role | null;
   userId: string | null;
@@ -32,8 +42,8 @@ interface AuthState {
   lockedUntil: number | null;
 
   setHydrated: (value: boolean) => void;
-  /** Email + password login for org_admin / employee (the `/` page). */
-  login: (email: string, password: string) => Promise<LoginResult>;
+  /** Access-key login for org_admin / employee (the `/` page). */
+  login: (key: string) => Promise<LoginResult>;
   /** Super-admin email + password login (the `/super-admin` page). */
   superAdminLogin: (email: string, password: string) => Promise<LoginResult>;
   /** Restore auth state from the current Supabase session. */
@@ -59,6 +69,16 @@ function loadProfile(userId: string) {
     .select('role, org_id, full_name, email')
     .eq('id', userId)
     .single();
+}
+
+/**
+ * Clear Level 1 progress so a newly logged-in (or logged-out) user never
+ * inherits the previous player's persisted `cybersim-level1` state. Deliberately
+ * NOT called from restoreSession(), so a mid-play page refresh keeps its state.
+ */
+function resetLevel1Progress() {
+  useGameStore.getState().resetGame();
+  useSimulationStore.setState({ modulesCleared: [], xp: 0, currentLevel: 1, level1Result: null });
 }
 
 function lockGuard(state: AuthState): LoginResult | null {
@@ -109,30 +129,52 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
-  login: async (email, password) => {
+  login: async (key) => {
     const locked = lockGuard(get());
     if (locked) return locked;
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (error || !data.user) return fail(set, get, 'Invalid email or password');
+    const trimmed = key.trim();
+    if (!trimmed) return fail(set, get, 'Enter your access key');
 
-    const { data: profile, error: pErr } = await loadProfile(data.user.id);
+    // 1. Exchange the ORG-/EMP- key for a one-time token via the public
+    //    `key-login` Edge Function. The function returns a generic error for
+    //    any bad/unknown key, so we never leak which keys exist.
+    const { data, error } = await supabase.functions.invoke<KeyLoginResponse>('key-login', {
+      body: { key: trimmed },
+    });
+    if (error || !data?.email || !data?.token) {
+      return fail(set, get, 'Invalid access key');
+    }
+
+    // 2. Turn the magic-link OTP into a real Supabase session.
+    const { data: verified, error: vErr } = await supabase.auth.verifyOtp({
+      email: data.email,
+      token: data.token,
+      type: 'magiclink',
+    });
+    if (vErr || !verified.user) {
+      return fail(set, get, 'Invalid access key');
+    }
+
+    // 3. Load the profile for role/org/name and set store state.
+    const { data: profile, error: pErr } = await loadProfile(verified.user.id);
     if (pErr || !profile) {
       await supabase.auth.signOut();
       return fail(set, get, 'Could not load your profile');
     }
     if (profile.role === 'super_admin') {
+      // Super admins authenticate on the dedicated /super-admin surface.
       await supabase.auth.signOut();
       return { success: false, error: 'Use the super-admin login for this account' };
     }
 
+    // Fresh login → start Level 1 clean (don't inherit a prior player's save).
+    if (profile.role === 'employee') resetLevel1Progress();
+
     set({
       isAuthenticated: true,
       role: profile.role,
-      userId: data.user.id,
+      userId: verified.user.id,
       orgId: profile.org_id,
       userName: profile.full_name || profile.email,
       redirectPath: rolePaths[profile.role],
@@ -177,6 +219,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     await supabase.auth.signOut();
+    resetLevel1Progress();
     set({ ...CLEARED });
   },
 }));

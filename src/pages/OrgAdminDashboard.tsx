@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { LayoutDashboard, Users, BarChart3, Download, CheckCircle, Trophy, Target, Search, Plus, X, Copy, Check, ChevronDown, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Download, CheckCircle, Trophy, Target, Search, Plus, X, ChevronDown, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
-import { useDataStore, type Employee } from '@/store/dataStore';
+import { useDataStore, type Employee, type CreatedEmployee } from '@/store/dataStore';
 import { useOrganizations, useEmployees } from '@/hooks/useOrgData';
+import { KeyReveal } from '@/components/ui/KeyReveal';
 import { useLiveAnalytics } from '@/hooks/useLiveAnalytics';
 import { DashboardSidebar } from '@/components/layout/Sidebar';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -194,8 +195,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
   const [newAge, setNewAge] = useState('');
   const [newGender, setNewGender] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
-  const [credCopied, setCredCopied] = useState(false);
+  const [createdEmp, setCreatedEmp] = useState<CreatedEmployee | null>(null);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
   const [bulkImportParsed, setBulkImportParsed] = useState<Array<Record<string, string>>>([]);
@@ -213,7 +213,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
     const age = newAge ? parseInt(newAge, 10) : undefined;
     setSubmitting(true);
     try {
-      const creds = await addEmployee(
+      const created = await addEmployee(
         newName.trim(),
         newEmail.trim(),
         orgId,
@@ -221,7 +221,8 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
         age,
         newGender || undefined
       );
-      setCredentials(creds);
+      setCreatedEmp(created);
+      toast.success(`Employee “${created.name}” created`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not create employee');
     } finally {
@@ -236,8 +237,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
     setNewJobRole('');
     setNewAge('');
     setNewGender('');
-    setCredentials(null);
-    setCredCopied(false);
+    setCreatedEmp(null);
   };
 
   const parseCSV = (csv: string): Array<Record<string, string>> => {
@@ -352,7 +352,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-elevated">
-                {['Name', 'Email', 'Role', 'Age', 'Gender', 'Level', 'Last Active', 'Status', ''].map(h => (
+                {['Name', 'Email', 'Access Key', 'Role', 'Age', 'Gender', 'Level', 'Last Active', 'Status', ''].map(h => (
                   <th key={h} className="text-left p-3 text-text-muted font-display text-[10px] tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -373,6 +373,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
                         </div>
                       </td>
                       <td className="p-3 text-text-secondary">{emp.email}</td>
+                      <td className="p-3" onClick={e => e.stopPropagation()}><KeyReveal value={emp.accessKey} /></td>
                       <td className="p-3 text-text-secondary">{emp.jobRole || '—'}</td>
                       <td className="p-3 text-text-secondary">{emp.age || '—'}</td>
                       <td className="p-3 text-text-secondary">{emp.gender || '—'}</td>
@@ -391,7 +392,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
                     <AnimatePresence>
                       {expandedId === emp.id && (
                         <tr>
-                          <td colSpan={9}>
+                          <td colSpan={10}>
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: 'auto', opacity: 1 }}
@@ -448,7 +449,7 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
                 <button onClick={handleClosePanel} className="text-text-muted hover:text-text-primary"><X className="w-5 h-5" /></button>
               </div>
 
-              {!credentials ? (
+              {!createdEmp ? (
                 <form onSubmit={handleAddEmployee}>
                   <label className="block mb-4">
                     <span className="font-display text-[10px] tracking-[0.2em] text-cyan mb-1 block">FULL NAME</span>
@@ -514,24 +515,23 @@ function EmployeesTab({ employees, orgId }: { employees: Employee[]; orgId: stri
                 </form>
               ) : (
                 <div>
-                  <p className="text-text-secondary text-sm mb-4">Employee <span className="text-text-primary font-semibold">{newName}</span> added! Share these sign-in credentials.</p>
+                  <div className="flex items-center gap-2 mb-4">
+                    <CheckCircle className="w-5 h-5 text-green shrink-0" />
+                    <p className="text-text-secondary text-sm">
+                      Employee <span className="text-text-primary font-semibold">{createdEmp.name}</span> created.
+                    </p>
+                  </div>
                   <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">EMAIL</label>
-                  <div className="bg-elevated border border-border rounded-lg px-4 py-3 mb-3">
-                    <code className="font-mono text-sm text-text-primary break-all">{credentials.email}</code>
+                  <div className="bg-elevated border border-border rounded-lg px-4 py-3 mb-4">
+                    <code className="font-mono text-sm text-text-primary break-all">{createdEmp.email}</code>
                   </div>
-                  <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">TEMPORARY PASSWORD</label>
-                  <div className="flex items-center gap-2 bg-elevated border border-border rounded-lg px-4 py-3 mb-3">
-                    <code className="font-mono text-sm text-cyan flex-1 tracking-wider break-all">{credentials.password}</code>
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(credentials.password); setCredCopied(true); setTimeout(() => setCredCopied(false), 2000); }}
-                      className="text-text-muted hover:text-cyan transition-colors shrink-0"
-                    >
-                      {credCopied ? <Check className="w-4 h-4 text-green" /> : <Copy className="w-4 h-4" />}
-                    </button>
+                  <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">EMPLOYEE ACCESS KEY</label>
+                  <div className="mb-4">
+                    <KeyReveal value={createdEmp.empKey} className="w-full justify-between" />
                   </div>
-                  <div className="flex items-start gap-2 bg-amber/10 border border-amber/20 rounded-lg p-3 mb-6">
-                    <AlertCircle className="w-4 h-4 text-amber mt-0.5 shrink-0" />
-                    <p className="text-amber text-xs">Copy these now — the password won't be shown again. The employee signs in at the main login.</p>
+                  <div className="flex items-start gap-2 bg-cyan/10 border border-cyan/20 rounded-lg p-3 mb-6">
+                    <AlertCircle className="w-4 h-4 text-cyan mt-0.5 shrink-0" />
+                    <p className="text-cyan text-xs">Share this access key with the employee — they sign in with it at the main login. You can reveal &amp; copy it again from the employees table.</p>
                   </div>
                   <NeonButton onClick={handleClosePanel} className="w-full">Done</NeonButton>
                 </div>

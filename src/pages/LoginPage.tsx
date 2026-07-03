@@ -19,9 +19,8 @@ function Corners({ color = 'border-cyan/50' }: { color?: string }) {
 }
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [key, setKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const login = useAuthStore(s => s.login);
@@ -29,10 +28,11 @@ export default function LoginPage() {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!email.trim() || !password) return;
+    if (!key.trim()) return;
     setLoading(true);
     setError('');
-    const result = await login(email, password);
+    // ORG- keys resolve to org_admin (-> /org-admin); EMP- keys to employee (-> /dashboard).
+    const result = await login(key);
     setLoading(false);
     if (result.success) {
       const role = useAuthStore.getState().role;
@@ -133,48 +133,37 @@ export default function LoginPage() {
             </div>
 
             <div className="mb-7">
-              <p className="font-body text-text-secondary font-light text-xl leading-tight">Sign in to</p>
-              <p className="font-display font-black text-4xl text-text-primary leading-tight mt-0.5">Your Account</p>
+              <p className="font-body text-text-secondary font-light text-xl leading-tight">Sign in with</p>
+              <p className="font-display font-black text-4xl text-text-primary leading-tight mt-0.5">Your Access Key</p>
             </div>
 
             <form onSubmit={handleSubmit}>
-              <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">EMAIL</label>
-              <div className="relative mb-4 flex items-center">
-                <span className="absolute left-4 font-mono text-xs text-cyan/50 select-none pointer-events-none">@</span>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setError(''); }}
-                  placeholder="you@company.com"
-                  className={`w-full bg-elevated border rounded-lg pl-10 pr-4 py-3.5 font-mono text-sm tracking-wider text-text-primary placeholder:text-text-muted/40 outline-none transition-all duration-300 ${
-                    error
-                      ? 'border-red shadow-[0_0_15px_rgba(255,45,107,0.2)]'
-                      : 'border-border focus:border-cyan focus:shadow-[0_0_20px_rgba(0,229,255,0.15)]'
-                  }`}
-                />
-              </div>
-
-              <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">PASSWORD</label>
+              <label className="font-display text-[10px] tracking-[0.2em] text-cyan mb-2 block">ACCESS KEY</label>
               <div className="relative mb-2 flex items-center">
                 <span className="absolute left-4 font-mono text-xs text-cyan/50 select-none pointer-events-none">›_</span>
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => { setPassword(e.target.value); setError(''); }}
-                  placeholder="••••••••"
+                  type={showKey ? 'text' : 'password'}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  value={key}
+                  onChange={e => { setKey(e.target.value); setError(''); }}
+                  placeholder="ORG-XXXXXXXX / EMP-XXXXXXXX"
                   className={`w-full bg-elevated border rounded-lg pl-10 pr-11 py-3.5 font-mono text-sm tracking-wider text-text-primary placeholder:text-text-muted/40 outline-none transition-all duration-300 ${
                     error
                       ? 'border-red shadow-[0_0_15px_rgba(255,45,107,0.2)]'
                       : 'border-border focus:border-cyan focus:shadow-[0_0_20px_rgba(0,229,255,0.15)]'
                   }`}
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 text-text-muted hover:text-cyan transition-colors">
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <button type="button" onClick={() => setShowKey(!showKey)}
+                  className="absolute right-4 text-text-muted hover:text-cyan transition-colors"
+                  aria-label={showKey ? 'Hide access key' : 'Show access key'}>
+                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <p className="font-mono text-[10px] text-text-muted/70 mb-2">
+                Use your organization or employee access key.
+              </p>
 
               <AnimatePresence>
                 {error && (

@@ -60,11 +60,11 @@ function unlockState(id: number, completed: number[], current: number): 'complet
 
 interface Props {
   id: number
-  displayNumber: number   // sequential label shown on the marker (1..N)
+  displayLabel: string   // sequential letter shown on the marker (A, B, C…). Display only — `id` stays numeric.
   position: THREE.Vector3
 }
 
-const AnnotationPoint = memo(function AnnotationPoint({ id, displayNumber, position }: Props) {
+const AnnotationPoint = memo(function AnnotationPoint({ id, displayLabel, position }: Props) {
   const currentPointId  = useGameStore(s => s.currentPointId)
   const completedPoints = useGameStore(s => s.completedPoints)
   const startPoint      = useGameStore(s => s.startPoint)
@@ -154,7 +154,9 @@ const AnnotationPoint = memo(function AnnotationPoint({ id, displayNumber, posit
         style={{
           position: 'relative',
           display: uiBlocked ? 'none' : 'block',
-          pointerEvents: state === 'locked' ? 'none' : 'auto',
+          // Locked markers stay clickable so a click surfaces the locked toast
+          // (startPoint refuses to open them); they're just visually dimmed.
+          pointerEvents: 'auto',
           opacity: visible ? 1 : 0,
           transform: visible ? 'scale(1)' : 'scale(0.6)',
           transition: 'opacity 400ms ease, transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1)',
@@ -163,7 +165,7 @@ const AnnotationPoint = memo(function AnnotationPoint({ id, displayNumber, posit
         <div className="ap-marker" style={{ position: 'relative', display: 'inline-block' }} onClick={handleClick}>
           {locate && <span className="ap-locate-ring" />}
           <div style={bubble} className={isUnlocking ? 'ap-unlocking' : locate ? 'ap-locating' : ''}>
-            {displayNumber}
+            {displayLabel}
           </div>
           {locate && <div className="ap-here">▾ HERE</div>}
           {/* Neutral prompt only — never the location or the attack type (no spoilers) */}

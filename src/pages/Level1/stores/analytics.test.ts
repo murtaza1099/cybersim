@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { insertPointsLedger, insertEvents } = vi.hoisted(() => ({
+const { insertPointsLedger, insertEvents, upsertModuleProgress, updateProfiles, eqProfiles } = vi.hoisted(() => ({
   insertPointsLedger: vi.fn(),
   insertEvents: vi.fn(),
+  upsertModuleProgress: vi.fn(),
+  updateProfiles: vi.fn(),
+  eqProfiles: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase', () => ({
@@ -10,6 +13,9 @@ vi.mock('@/lib/supabase', () => ({
     from: (table: string) => {
       if (table === 'points_ledger') return { insert: insertPointsLedger }
       if (table === 'events') return { insert: insertEvents }
+      // Live module-progress + last_active writes (drive the dashboards).
+      if (table === 'module_progress') return { upsert: upsertModuleProgress }
+      if (table === 'profiles') return { update: updateProfiles }
       throw new Error(`unexpected table ${table}`)
     },
   },
@@ -32,6 +38,9 @@ describe('recordObjectiveOutcome', () => {
   beforeEach(() => {
     insertPointsLedger.mockReset().mockResolvedValue({ error: null })
     insertEvents.mockReset().mockResolvedValue({ error: null })
+    upsertModuleProgress.mockReset().mockResolvedValue({ error: null })
+    eqProfiles.mockReset().mockResolvedValue({ error: null })
+    updateProfiles.mockReset().mockReturnValue({ eq: eqProfiles })
     mockedGetState.mockReset()
   })
 

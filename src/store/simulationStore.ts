@@ -32,8 +32,8 @@ interface SimulationState {
 
 export const useSimulationStore = create<SimulationState>((set) => ({
   currentLevel: 1,
-  modulesCleared: ['phishing', 'tailgating'],
-  xp: 1250,
+  modulesCleared: [],
+  xp: 0,
   level1Result: null,
   setLevel: (level) => set({ currentLevel: level }),
   clearModule: (moduleId) =>

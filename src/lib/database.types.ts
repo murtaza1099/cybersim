@@ -221,18 +221,21 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          org_key: string
           status: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          org_key: string
           status?: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          org_key?: string
           status?: string
         }
         Relationships: []
@@ -284,6 +287,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          access_key: string | null
           age: number | null
           created_at: string
           email: string | null
@@ -299,6 +303,7 @@ export type Database = {
           xp: number
         }
         Insert: {
+          access_key?: string | null
           age?: number | null
           created_at?: string
           email?: string | null
@@ -314,6 +319,7 @@ export type Database = {
           xp?: number
         }
         Update: {
+          access_key?: string | null
           age?: number | null
           created_at?: string
           email?: string | null

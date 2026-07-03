@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -7,6 +7,8 @@ import Level1Simulation, { type Level1ExitResult } from './App'
 import { useAuthStore } from '@/store/authStore'
 import { useDataStore } from '@/store/dataStore'
 import { useSimulationStore } from '@/store/simulationStore'
+import { useGameStore } from './stores/gameStore'
+import { recordLevelComplete } from './stores/analytics'
 
 const STEPS = [
   { icon: Cpu,    label: 'LOADING ENVIRONMENT',      t: 0 },
@@ -84,10 +86,26 @@ export default function Level1Route() {
   const completeEmployeeLevel1 = useDataStore(s => s.completeLevel1)
   const completeSessionLevel1 = useSimulationStore(s => s.completeLevel1)
 
+  // Owner-aware reset: if the persisted Level 1 save belongs to a different (or
+  // no) user, wipe it before the scene seeds from the store — so a first-time
+  // user ALWAYS starts clean on their first entry, whether they arrived via
+  // login() or a restored session. Runs as a layout effect so it lands before
+  // the simulation's reconcileObjective() passive effect. A returning same-user
+  // keeps genuine in-progress state (ownerUserId matches).
+  useLayoutEffect(() => {
+    useGameStore.getState().ensureOwner(userId)
+  }, [userId])
+
   const handleExit = useCallback((result?: Level1ExitResult) => {
     if (result && result.status !== 'in-progress') {
       const completedResult = { ...result, completedAt: new Date().toISOString() }
       completeSessionLevel1(completedResult)
+      recordLevelComplete({
+        status: result.status,
+        score: result.score,
+        completedAttacks: result.completedAttacks,
+        failedAttacks: result.failedAttacks,
+      })
       if (userId) {
         completeEmployeeLevel1(userId, completedResult).catch((err) => {
           console.error('Failed to save Level 1 result', err)
