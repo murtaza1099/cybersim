@@ -10,6 +10,7 @@ import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import OrgAdminDashboard from "./pages/OrgAdminDashboard";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import Level1Route from "./pages/Level1/Level1Route";
+import { SceneErrorBoundary } from "./pages/Level1/components/SceneErrorBoundary";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { PageTransition } from "./components/layout/PageTransition";
 
@@ -27,7 +28,7 @@ function AnimatedRoutes() {
         <Route path="/super-admin" element={<ProtectedRoute role="super_admin"><PageTransition><SuperAdminDashboard /></PageTransition></ProtectedRoute>} />
         <Route path="/org-admin" element={<ProtectedRoute role="org_admin"><PageTransition><OrgAdminDashboard /></PageTransition></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute role="employee"><PageTransition><EmployeeDashboard /></PageTransition></ProtectedRoute>} />
-        <Route path="/simulation/level-1" element={<ProtectedRoute role="employee"><Level1Route /></ProtectedRoute>} />
+        <Route path="/simulation/level-1" element={<ProtectedRoute role="employee"><SceneErrorBoundary><Level1Route /></SceneErrorBoundary></ProtectedRoute>} />
         <Route path="/simulation/play" element={<ProtectedRoute role="employee"><Navigate to="/simulation/level-1" replace /></ProtectedRoute>} />
         <Route path="/simulation/*" element={<ProtectedRoute role="employee"><Navigate to="/dashboard" replace /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
